@@ -141,7 +141,7 @@ A modern, web-based database backup management system built with Next.js 14+, Ty
    - Open <http://localhost:3000>
    - Login with default credentials: `admin` / `admin`
 
-For detailed Docker setup instructions, see [README.docker.md](./README.docker.md).
+For detailed Docker setup instructions, see [Docker Documentation](./docs/DOCKER.md).
 
 ## 📖 Usage Guide
 
@@ -349,6 +349,10 @@ bun run lint         # Run ESLint
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+
+## 📚 Documentation
+
+- [Docker Deployment Guide](./docs/DOCKER.md) - Complete Docker setup and deployment instructions
 
 ## 🤝 Contributing
 
