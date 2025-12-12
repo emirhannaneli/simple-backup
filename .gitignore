@@ -17,6 +17,11 @@
 /.next/
 /out/
 
+# Docker secrets
+/secrets/*
+!/secrets/.gitignore
+!/secrets/*.example
+
 # production
 /build
 

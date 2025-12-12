@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  simple-backup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: simple-backup-dev
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+      - PORT=3001
+      - HOSTNAME=0.0.0.0
+      # Docker secrets are mounted at /run/secrets/ by default
+      - DATABASE_URL_FILE=/run/secrets/DATABASE_URL
+      - JWT_SECRET_FILE=/run/secrets/JWT_SECRET
+      - ENCRYPTION_KEY_FILE=/run/secrets/ENCRYPTION_KEY
+      - BACKUP_BASE_PATH_FILE=/run/secrets/BACKUP_BASE_PATH
+      # Default DATABASE_URL if not in secrets
+      - DATABASE_URL=file:/data/system.db
+    secrets:
+      - DATABASE_URL
+      - JWT_SECRET
+      - ENCRYPTION_KEY
+      - BACKUP_BASE_PATH
+    volumes:
+      # Mount source code for hot reload
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+      # Persist database in /data
+      - db-data:/data
+      # Persist backups
+      - backup-data:/app/backups
+    command: bun run dev
+    networks:
+      - simple-backup-network
+
+volumes:
+  db-data:
+    driver: local
+  backup-data:
+    driver: local
+
+secrets:
+  DATABASE_URL:
+    file: ./secrets/DATABASE_URL
+  JWT_SECRET:
+    file: ./secrets/JWT_SECRET
+  ENCRYPTION_KEY:
+    file: ./secrets/ENCRYPTION_KEY
+  BACKUP_BASE_PATH:
+    file: ./secrets/BACKUP_BASE_PATH
+
+networks:
+  simple-backup-network:
+    driver: bridge
+

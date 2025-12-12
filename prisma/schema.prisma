@@ -1,0 +1,91 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         String   @default("ADMIN") // ADMIN or USER
+  createdAt    DateTime @default(now())
+
+  @@map("users")
+}
+
+model Datasource {
+  id              String   @id @default(cuid())
+  name            String
+  type            String   // MYSQL, POSTGRES, or MONGODB
+  host            String
+  port            Int
+  username        String
+  passwordEncrypted String
+  databaseName    String
+  createdAt       DateTime @default(now())
+
+  jobs            Job[]
+
+  @@map("datasources")
+}
+
+model Job {
+  id              String   @id @default(cuid())
+  title           String
+  datasourceId    String
+  datasource      Datasource  @relation(fields: [datasourceId], references: [id], onDelete: Cascade)
+  cronExpression  String
+  destinationPath String
+  status          String   @default("IDLE") // IDLE, RUNNING, or ERROR
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  backups         Backup[]
+
+  @@map("jobs")
+}
+
+model Backup {
+  id           String   @id @default(cuid())
+  jobId        String
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  filename     String
+  filePath     String
+  size         BigInt
+  status       String   // SUCCESS or FAILED
+  durationMs   Int
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@map("backups")
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  name       String
+  keyHash    String    @unique
+  prefix     String
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@map("api_keys")
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  url       String
+  method    String   @default("POST")
+  events    String   // JSON array of event types
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("webhooks")
+}
+
