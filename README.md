@@ -18,6 +18,13 @@ A modern, web-based database backup management system built with Next.js 14+, Ty
 - **MySQL** - Full support for MySQL/MariaDB databases
 - **PostgreSQL** - Complete PostgreSQL backup capabilities
 - **MongoDB** - MongoDB database backup support
+- **Redis** - RDB snapshot backup support
+- **Cassandra** - Snapshot backup support
+- **Elasticsearch** - Snapshot backup via REST API
+- **InfluxDB** - Influx backup support
+- **Neo4j** - Database dump support
+- **SQLite** - File-based backup support
+- **H2** - Script/export backup support
 
 ### ⚙️ Core Functionality
 
@@ -58,11 +65,18 @@ A modern, web-based database backup management system built with Next.js 14+, Ty
 ### Prerequisites
 
 - Node.js 20+ or Bun
-- Database client tools installed:
+- Database client tools installed (depending on which databases you want to backup):
 
   - MySQL: `mysql` and `mysqldump`
   - PostgreSQL: `psql` and `pg_dump`
   - MongoDB: `mongosh` and `mongodump`
+  - Redis: `redis-cli`
+  - Cassandra: `cqlsh` and `nodetool`
+  - Elasticsearch: `curl` (REST API)
+  - InfluxDB: `influx` CLI
+  - Neo4j: `cypher-shell` and `neo4j-admin`
+  - SQLite: `sqlite3`
+  - H2: `h2.jar` (Java required)
 
 ### Installation
 
@@ -127,7 +141,7 @@ A modern, web-based database backup management system built with Next.js 14+, Ty
    echo "file:/data/system.db" > secrets/DATABASE_URL
    echo "your-jwt-secret" > secrets/JWT_SECRET
    echo "your-encryption-key" > secrets/ENCRYPTION_KEY
-   echo "./backups" > secrets/BACKUP_BASE_PATH
+   echo "/data/backups" > secrets/BACKUP_BASE_PATH
    ```
 
 2. **Start with Docker Compose**
@@ -138,8 +152,16 @@ A modern, web-based database backup management system built with Next.js 14+, Ty
 
 3. **Access the application**
 
-   - Open <http://localhost:3000>
+   - Open <http://localhost>
    - Login with default credentials: `admin` / `admin`
+
+**Note:** You can also use `*_FILE` environment variables to specify custom file paths for secrets:
+- `DATABASE_URL_FILE=/custom/path/db-url`
+- `JWT_SECRET_FILE=/custom/path/jwt-secret`
+- `ENCRYPTION_KEY_FILE=/custom/path/encryption-key`
+- `BACKUP_BASE_PATH_FILE=/custom/path/backup-path`
+
+The priority order is: `*_FILE` env var > `/run/secrets/*` > direct env var > default.
 
 For detailed Docker setup instructions, see [Docker Documentation](./docs/DOCKER.md).
 
@@ -157,12 +179,12 @@ For detailed Docker setup instructions, see [Docker Documentation](./docs/DOCKER
 2. Click **Create Datasource**
 3. Fill in the connection details:
    - Name: A friendly name for this connection
-   - Database Type: MySQL, PostgreSQL, or MongoDB
-   - Host: Database server hostname or IP
-   - Port: Database server port (defaults provided)
-   - Username: Database username
-   - Password: Database password
-   - Database Name: Target database name
+   - Database Type: Select from MySQL, PostgreSQL, MongoDB, Redis, Cassandra, Elasticsearch, InfluxDB, Neo4j, SQLite, or H2
+   - Host: Database server hostname or IP (not required for SQLite)
+   - Port: Database server port (defaults provided, not required for SQLite)
+   - Username: Database username (optional for Redis, not required for SQLite)
+   - Password: Database password (optional for Redis, not required for SQLite)
+   - Database Name/Path: Target database name, file path (for SQLite/H2), or JDBC URL (for H2)
 4. Click **Test Connection** to verify the connection
 5. Click **Create** to save
 
@@ -222,18 +244,40 @@ The application includes a comprehensive API documentation page accessible at `/
 ### Example API Usage
 
 ```bash
-# Create a datasource
+# Create a MySQL datasource
 curl -X POST http://localhost:3001/api/datasources \
   -H "X-API-Key: your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Production DB",
+    "name": "Production MySQL",
     "type": "MYSQL",
     "host": "localhost",
     "port": 3306,
     "username": "root",
     "password": "password",
     "databaseName": "mydb"
+  }'
+
+# Create a Redis datasource (username/password optional)
+curl -X POST http://localhost:3001/api/datasources \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Redis Cache",
+    "type": "REDIS",
+    "host": "localhost",
+    "port": 6379,
+    "databaseName": "0"
+  }'
+
+# Create a SQLite datasource (host/port not required)
+curl -X POST http://localhost:3001/api/datasources \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Local SQLite",
+    "type": "SQLITE",
+    "databaseName": "/path/to/database.db"
   }'
 
 # Trigger a backup job
@@ -343,8 +387,8 @@ bun run lint         # Run ESLint
 | `DATABASE_URL` | SQLite database path | `file:./prisma/system.db` |
 | `JWT_SECRET` | JWT signing secret | (required in production) |
 | `ENCRYPTION_KEY` | Encryption key for passwords | (required in production) |
-| `BACKUP_BASE_PATH` | Base path for backup files | `./backups` |
-| `NEXT_PUBLIC_APP_URL` | Public app URL | `http://localhost:3000` |
+| `BACKUP_BASE_PATH` | Base path for backup files | `./backups` (local), `/data/backups` (Docker) |
+| `NEXT_PUBLIC_APP_URL` | Public app URL | `http://localhost:80` (Docker), `http://localhost:3001` (local dev) |
 
 ## 📝 License
 

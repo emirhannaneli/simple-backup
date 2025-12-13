@@ -12,7 +12,7 @@ New-Item -ItemType Directory -Path secrets -Force
 Set-Content -Path secrets\DATABASE_URL -Value "file:/data/system.db"
 Set-Content -Path secrets\JWT_SECRET -Value "your-super-secret-jwt-key-min-32-chars"
 Set-Content -Path secrets\ENCRYPTION_KEY -Value "your-super-secret-encryption-key-32-chars"
-Set-Content -Path secrets\BACKUP_BASE_PATH -Value "./backups"
+Set-Content -Path secrets\BACKUP_BASE_PATH -Value "/data/backups"
 ```
 
 **Linux/Mac:**
@@ -21,7 +21,7 @@ mkdir -p secrets
 echo "file:/data/system.db" > secrets/DATABASE_URL
 echo "your-super-secret-jwt-key-min-32-chars" > secrets/JWT_SECRET
 echo "your-super-secret-encryption-key-32-chars" > secrets/ENCRYPTION_KEY
-echo "./backups" > secrets/BACKUP_BASE_PATH
+echo "/data/backups" > secrets/BACKUP_BASE_PATH
 ```
 
 **Important**: Never commit these files to version control! They are already in `.gitignore`.
@@ -60,7 +60,7 @@ docker-compose -f docker-compose.dev.yml up
 
 ### 3. Access the Application
 
-- Web UI: http://localhost:3000
+- Web UI: http://localhost
 - Default credentials: `admin` / `admin` (change after first login!)
 
 ## Docker Secrets
@@ -74,14 +74,36 @@ The entrypoint script (`docker-entrypoint.sh`) loads secrets from `/run/secrets/
 - `secrets/DATABASE_URL` - SQLite database path (e.g., `file:/data/system.db`)
 - `secrets/JWT_SECRET` - JWT signing secret (min 32 characters)
 - `secrets/ENCRYPTION_KEY` - Encryption key for datasource passwords (32 chars or 64 hex)
-- `secrets/BACKUP_BASE_PATH` - Base path for backup files (e.g., `./backups`)
+- `secrets/BACKUP_BASE_PATH` - Base path for backup files (e.g., `/data/backups`)
+
+### Environment Variables with `*_FILE` Pattern
+
+You can also use the `*_FILE` environment variable pattern to specify custom file paths for secrets:
+
+- `DATABASE_URL_FILE` - Path to file containing DATABASE_URL
+- `JWT_SECRET_FILE` - Path to file containing JWT_SECRET
+- `ENCRYPTION_KEY_FILE` - Path to file containing ENCRYPTION_KEY
+- `BACKUP_BASE_PATH_FILE` - Path to file containing BACKUP_BASE_PATH
+
+**Priority order:**
+1. `*_FILE` environment variable (if set and file exists)
+2. `/run/secrets/*` (Docker secrets default location)
+3. Direct environment variable (e.g., `JWT_SECRET=value`)
+4. Default value (if applicable)
+
+**Example:**
+```yaml
+environment:
+  - JWT_SECRET_FILE=/custom/path/jwt-secret.txt
+  - ENCRYPTION_KEY_FILE=/custom/path/encryption-key.txt
+```
 
 ## Volumes
 
 The following volumes are created to persist data:
 
 - `db-data` - SQLite database file (`/data/system.db`)
-- `backup-data` - Backup files (`/app/backups/`)
+- `backup-data` - Backup files (`/data/backups/`)
 
 ## Environment Variables
 
@@ -92,7 +114,7 @@ environment:
   - DATABASE_URL=file:/data/system.db
   - JWT_SECRET=your-secret
   - ENCRYPTION_KEY=your-key
-  - BACKUP_BASE_PATH=./backups
+  - BACKUP_BASE_PATH=/data/backups
 ```
 
 However, using Docker secrets is recommended for production as they are more secure.

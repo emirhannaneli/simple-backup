@@ -49,7 +49,15 @@ export function DatasourceForm({
     setValue,
     watch,
     reset,
-  } = useForm({
+  } = useForm<{
+    name: string;
+    type: "MYSQL" | "POSTGRES" | "MONGODB" | "REDIS" | "CASSANDRA" | "ELASTICSEARCH" | "INFLUXDB" | "NEO4J" | "SQLITE" | "H2";
+    host?: string;
+    port?: number;
+    username?: string;
+    password?: string;
+    databaseName: string;
+  }>({
     resolver: zodResolver(datasourceSchema),
     defaultValues: {
       name: "",
@@ -69,7 +77,7 @@ export function DatasourceForm({
       if (datasource) {
         reset({
           name: datasource.name,
-          type: datasource.type as "MYSQL" | "POSTGRES" | "MONGODB",
+          type: datasource.type as "MYSQL" | "POSTGRES" | "MONGODB" | "REDIS" | "CASSANDRA" | "ELASTICSEARCH" | "INFLUXDB" | "NEO4J" | "SQLITE" | "H2",
           host: datasource.host,
           port: datasource.port,
           username: datasource.username,
@@ -92,12 +100,27 @@ export function DatasourceForm({
 
   useEffect(() => {
     // Set default port based on type
-    if (dbType === "MYSQL") {
-      setValue("port", 3306);
-    } else if (dbType === "POSTGRES") {
-      setValue("port", 5432);
-    } else if (dbType === "MONGODB") {
-      setValue("port", 27017);
+    const defaultPorts: Record<string, number> = {
+      MYSQL: 3306,
+      POSTGRES: 5432,
+      MONGODB: 27017,
+      REDIS: 6379,
+      CASSANDRA: 9042,
+      ELASTICSEARCH: 9200,
+      INFLUXDB: 8086,
+      NEO4J: 7687,
+      SQLITE: 0, // Not applicable
+      H2: 8082,
+    };
+    
+    if (defaultPorts[dbType] !== undefined && dbType !== "SQLITE") {
+      setValue("port", defaultPorts[dbType]);
+    }
+    
+    // Clear host/port for SQLite
+    if (dbType === "SQLITE") {
+      setValue("host", "");
+      setValue("port", 0);
     }
   }, [dbType, setValue]);
 
@@ -105,43 +128,11 @@ export function DatasourceForm({
     const formData = watch();
     setTesting(true);
     try {
-      let datasourceId = datasource?.id;
-
-      // If creating new datasource, save it first
-      if (!datasourceId) {
-        const createRes = await fetch("/api/datasources", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        });
-
-        if (!createRes.ok) {
-          const error = await createRes.json();
-          toast.error(error.error || "Failed to create datasource for testing");
-          setTesting(false);
-          return;
-        }
-
-        const created = await createRes.json();
-        datasourceId = created.datasource.id;
-      } else if (datasource) {
-        // Update existing datasource first
-        const updateRes = await fetch(`/api/datasources/${datasource.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        });
-
-        if (!updateRes.ok) {
-          toast.error("Failed to update datasource");
-          setTesting(false);
-          return;
-        }
-      }
-
-      // Now test the connection
-      const testRes = await fetch(`/api/datasources/${datasourceId}/test`, {
+      // Test connection directly with form data (no need to save)
+      const testRes = await fetch("/api/datasources/test", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
       });
 
       const result = await testRes.json();
@@ -149,7 +140,7 @@ export function DatasourceForm({
       if (result.success) {
         // Parse multi-line success message
         const message = result.message || "Connection successful!";
-        const lines = message.split("\n").filter(line => line.trim());
+        const lines = message.split("\n").filter((line: string) => line.trim());
         const title = lines[0] || "Connection Successful";
         const description = lines.slice(1).join("\n") || "Database connection verified.";
         
@@ -160,7 +151,7 @@ export function DatasourceForm({
       } else {
         // Parse multi-line error message
         const error = result.error || "Connection failed";
-        const lines = error.split("\n").filter(line => line.trim());
+        const lines = error.split("\n").filter((line: string) => line.trim());
         const title = lines[0] || "Connection Failed";
         const description = lines.slice(1).join("\n") || "Please check your connection settings.";
         
@@ -176,7 +167,7 @@ export function DatasourceForm({
     }
   }
 
-  const onSubmit = async (data: { name: string; type: "MYSQL" | "POSTGRES" | "MONGODB"; host: string; port: number; username: string; password: string; databaseName: string }) => {
+  const onSubmit = async (data: { name: string; type: string; host?: string; port?: number; username?: string; password?: string; databaseName: string }) => {
     setLoading(true);
     try {
       const url = datasource ? `/api/datasources/${datasource.id}` : "/api/datasources";
@@ -237,6 +228,13 @@ export function DatasourceForm({
                 <SelectItem value="MYSQL">MySQL</SelectItem>
                 <SelectItem value="POSTGRES">PostgreSQL</SelectItem>
                 <SelectItem value="MONGODB">MongoDB</SelectItem>
+                <SelectItem value="REDIS">Redis</SelectItem>
+                <SelectItem value="CASSANDRA">Cassandra</SelectItem>
+                <SelectItem value="ELASTICSEARCH">Elasticsearch</SelectItem>
+                <SelectItem value="INFLUXDB">InfluxDB</SelectItem>
+                <SelectItem value="NEO4J">Neo4j</SelectItem>
+                <SelectItem value="SQLITE">SQLite</SelectItem>
+                <SelectItem value="H2">H2</SelectItem>
               </SelectContent>
             </Select>
             {errors.type && (
@@ -244,50 +242,111 @@ export function DatasourceForm({
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="host">Host</Label>
-            <Input id="host" {...register("host")} placeholder="localhost" />
-            {errors.host && (
-              <p className="text-sm text-destructive">{errors.host.message as string}</p>
-            )}
-          </div>
+          {dbType !== "SQLITE" && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="host">Host</Label>
+                <Input id="host" {...register("host")} placeholder="localhost" />
+                {errors.host && (
+                  <p className="text-sm text-destructive">{errors.host.message as string}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="port">Port</Label>
+                <Input
+                  id="port"
+                  type="number"
+                  {...register("port", { valueAsNumber: true })}
+                />
+                {errors.port && (
+                  <p className="text-sm text-destructive">{errors.port.message as string}</p>
+                )}
+              </div>
+            </>
+          )}
+
+          {dbType !== "SQLITE" && (
+            <>
+              {dbType !== "REDIS" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Username</Label>
+                    <Input id="username" {...register("username")} placeholder={dbType === "H2" ? "sa (default)" : ""} />
+                    {errors.username && (
+                      <p className="text-sm text-destructive">{errors.username.message as string}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      {...register("password")}
+                      placeholder={datasource ? "Leave empty to keep current" : ""}
+                    />
+                    {errors.password && (
+                      <p className="text-sm text-destructive">{errors.password.message as string}</p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {dbType === "REDIS" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Username (Optional)</Label>
+                    <Input id="username" {...register("username")} placeholder="Optional - Redis 6+ ACL" />
+                    {errors.username && (
+                      <p className="text-sm text-destructive">{errors.username.message as string}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password (Optional)</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      {...register("password")}
+                      placeholder="Optional - Leave empty if no auth"
+                    />
+                    {errors.password && (
+                      <p className="text-sm text-destructive">{errors.password.message as string}</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </>
+          )}
 
           <div className="space-y-2">
-            <Label htmlFor="port">Port</Label>
-            <Input
-              id="port"
-              type="number"
-              {...register("port", { valueAsNumber: true })}
+            <Label htmlFor="databaseName">
+              {dbType === "SQLITE" 
+                ? "Database File Path" 
+                : dbType === "H2" 
+                ? "Database Path or JDBC URL" 
+                : dbType === "REDIS"
+                ? "Database Index (0-15, optional)"
+                : dbType === "ELASTICSEARCH"
+                ? "Repository Name"
+                : "Database Name"}
+            </Label>
+            <Input 
+              id="databaseName" 
+              {...register("databaseName")} 
+              placeholder={
+                dbType === "SQLITE" 
+                  ? "/path/to/database.db" 
+                  : dbType === "H2" 
+                  ? "jdbc:h2:file:/path/to/db or /path/to/db" 
+                  : dbType === "REDIS"
+                  ? "0 (default)"
+                  : dbType === "ELASTICSEARCH"
+                  ? "backup_repo"
+                  : "mydb"
+              }
             />
-            {errors.port && (
-              <p className="text-sm text-destructive">{errors.port.message as string}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
-            <Input id="username" {...register("username")} />
-            {errors.username && (
-              <p className="text-sm text-destructive">{errors.username.message as string}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              {...register("password")}
-              placeholder={datasource ? "Leave empty to keep current" : ""}
-            />
-            {errors.password && (
-              <p className="text-sm text-destructive">{errors.password.message as string}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="databaseName">Database Name</Label>
-            <Input id="databaseName" {...register("databaseName")} />
             {errors.databaseName && (
               <p className="text-sm text-destructive">
                 {errors.databaseName.message as string}

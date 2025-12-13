@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { datasourceSchema } from "@/lib/validations";
 import { encrypt } from "@/lib/encryption";
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
 
 export async function GET(
   request: Request,
@@ -47,22 +48,88 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const validated = datasourceSchema.parse(body);
+    
+    // Get existing datasource to check current password
+    const existingDatasource = await prisma.datasource.findUnique({
+      where: { id },
+    });
+    
+    if (!existingDatasource) {
+      return NextResponse.json({ error: "Datasource not found" }, { status: 404 });
+    }
+    
+    // For updates, password is optional (empty string means keep existing)
+    // Create a modified schema that allows empty password for updates
+    // We need to recreate the schema without the password refine
+    const updateSchema = z.object({
+      name: z.string().min(1, "Name is required"),
+      type: z.enum(["MYSQL", "POSTGRES", "MONGODB", "REDIS", "CASSANDRA", "ELASTICSEARCH", "INFLUXDB", "NEO4J", "SQLITE", "H2"]),
+      host: z.string().optional(),
+      port: z.number().int().min(1).max(65535).optional(),
+      username: z.string().optional(),
+      password: z.string().optional(), // Always optional for updates
+      databaseName: z.string().min(1, "Database name/path is required"),
+    }).refine((data) => {
+      // SQLite and H2 (file-based) don't require host/port
+      if (data.type === "SQLITE") {
+        return true;
+      }
+      if (data.type === "H2" && data.databaseName?.startsWith("jdbc:h2:file:")) {
+        return true;
+      }
+      if (data.type === "REDIS") {
+        return data.host && data.port;
+      }
+      return data.host && data.port;
+    }, {
+      message: "Host and port are required for this database type",
+      path: ["host"],
+    }).refine((data) => {
+      // Most databases require username, except Redis (optional) and SQLite (not applicable)
+      if (data.type === "SQLITE" || data.type === "REDIS") {
+        return true;
+      }
+      if (data.type === "H2" && data.databaseName?.startsWith("jdbc:h2:file:")) {
+        return true;
+      }
+      return !!data.username;
+    }, {
+      message: "Username is required for this database type",
+      path: ["username"],
+    });
+    // Note: Password validation is intentionally omitted for updates
+    
+    const validated = updateSchema.parse(body);
 
-    // Encrypt password before storing
-    const passwordEncrypted = encrypt(validated.password);
+    // Encrypt password before storing (only if provided and not empty)
+    const passwordEncrypted = validated.password && validated.password !== "" 
+      ? encrypt(validated.password) 
+      : undefined;
+
+    // Build update data object, only including fields that are provided
+    const updateData: any = {
+      name: validated.name,
+      type: validated.type,
+      databaseName: validated.databaseName,
+    };
+
+    // Only update optional fields if they are provided
+    if (validated.host !== undefined) {
+      updateData.host = validated.host;
+    }
+    if (validated.port !== undefined) {
+      updateData.port = validated.port;
+    }
+    if (validated.username !== undefined) {
+      updateData.username = validated.username;
+    }
+    if (passwordEncrypted !== undefined) {
+      updateData.passwordEncrypted = passwordEncrypted;
+    }
 
     const datasource = await prisma.datasource.update({
       where: { id },
-      data: {
-        name: validated.name,
-        type: validated.type,
-        host: validated.host,
-        port: validated.port,
-        username: validated.username,
-        passwordEncrypted,
-        databaseName: validated.databaseName,
-      },
+      data: updateData,
     });
 
     // Don't return encrypted password

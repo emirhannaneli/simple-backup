@@ -27,6 +27,12 @@ export async function GET(request: Request) {
     take: 100,
   });
 
-  return NextResponse.json({ backups });
+  // Convert BigInt to string for JSON serialization
+  const serializedBackups = backups.map(backup => ({
+    ...backup,
+    size: backup.size.toString(),
+  }));
+
+  return NextResponse.json({ backups: serializedBackups });
 }
 

@@ -10,7 +10,14 @@ import { triggerWebhooks } from "./webhook-service";
 import { formatBytes } from "./format";
 import { prisma } from "./prisma";
 
-const BACKUP_BASE_PATH = process.env.BACKUP_BASE_PATH || "./backups";
+// Ensure BACKUP_BASE_PATH is set to /data/backups (default for Docker)
+// This can be overridden via environment variable or Docker secrets
+const BACKUP_BASE_PATH = process.env.BACKUP_BASE_PATH || "/data/backups";
+
+// Log backup path on module load (only in development or if explicitly enabled)
+if (process.env.NODE_ENV === "development" || process.env.LOG_BACKUP_PATH === "true") {
+  console.log(`📦 Backup base path: ${BACKUP_BASE_PATH}`);
+}
 
 export async function ensureBackupDirectory(dirPath: string): Promise<void> {
   try {
@@ -53,22 +60,46 @@ export async function executeBackup(jobId: string): Promise<void> {
 
     // Prepare connection info
     const conn: DatabaseConnection = {
-      type: job.datasource.type as "MYSQL" | "POSTGRES" | "MONGODB",
-      host: job.datasource.host,
-      port: job.datasource.port,
-      username: job.datasource.username,
-      password: decryptedPassword,
+      type: job.datasource.type as DatabaseConnection["type"],
+      host: job.datasource.host || undefined,
+      port: job.datasource.port || undefined,
+      username: job.datasource.username || undefined,
+      password: decryptedPassword || undefined,
       databaseName: job.datasource.databaseName,
     };
 
-    // Ensure destination directory exists
-    await ensureBackupDirectory(job.destinationPath);
+    // Create job-specific directory: BACKUP_BASE_PATH/{destinationPath}
+    // Use the destinationPath from job configuration
+    // Ensure BACKUP_BASE_PATH is /data/backups (or configured path)
+    const backupBasePath = BACKUP_BASE_PATH || "/data/backups";
+    
+    // Sanitize destinationPath to make it filesystem-safe
+    // Remove leading/trailing slashes and normalize path separators
+    let sanitizedPath = job.destinationPath.trim().replace(/^\/+|\/+$/g, "").replace(/\\/g, "/");
+    
+    // Replace invalid characters with underscores
+    sanitizedPath = sanitizedPath.replace(/[<>:"|?*\x00-\x1f]/g, "_");
+    
+    // If destinationPath is empty or invalid, use job ID as fallback
+    if (!sanitizedPath || sanitizedPath.length === 0) {
+      sanitizedPath = `job-${job.id}`;
+    }
+    
+    // Build full backup directory path
+    const jobBackupDir = path.join(backupBasePath, sanitizedPath);
+    
+    // Ensure backup base directory exists first
+    await ensureBackupDirectory(backupBasePath);
+    // Then ensure job-specific directory exists (recursive for nested paths)
+    await ensureBackupDirectory(jobBackupDir);
+    
+    console.log(`📦 Creating backup in: ${jobBackupDir}`);
 
     // Generate filename
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const extension = getFileExtension(job.datasource.type as "MYSQL" | "POSTGRES" | "MONGODB");
+    const extension = getFileExtension(job.datasource.type as DatabaseConnection["type"]);
     filename = `${job.title.replace(/[^a-zA-Z0-9]/g, "_")}_${timestamp}.${extension}`;
-    filePath = path.join(job.destinationPath, filename);
+    filePath = path.join(jobBackupDir, filename);
 
     // Create backup record
     backupRecord = await prisma.backup.create({

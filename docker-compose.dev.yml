@@ -35,7 +35,7 @@ services:
       # Persist database in /data
       - db-data:/data
       # Persist backups
-      - backup-data:/app/backups
+      - backup-data:/data/backups
     command: bun run dev
     networks:
       - simple-backup-network

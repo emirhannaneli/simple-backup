@@ -56,9 +56,13 @@ export function loadEnvSecrets() {
           process.env.BACKUP_BASE_PATH = fs.readFileSync("/run/secrets/BACKUP_BASE_PATH", "utf8").trim();
         } else if (process.env.BACKUP_BASE_PATH_FILE && fs.existsSync(process.env.BACKUP_BASE_PATH_FILE)) {
           process.env.BACKUP_BASE_PATH = fs.readFileSync(process.env.BACKUP_BASE_PATH_FILE, "utf8").trim();
+        } else {
+          // Default to /data/backups (Docker standard path)
+          process.env.BACKUP_BASE_PATH = "/data/backups";
         }
       } catch (error) {
         // Fall through to default
+        process.env.BACKUP_BASE_PATH = "/data/backups";
       }
     }
   } catch (error) {

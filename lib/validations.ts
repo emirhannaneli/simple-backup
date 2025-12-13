@@ -8,12 +8,56 @@ export const loginSchema = z.object({
 
 export const datasourceSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  type: z.enum(["MYSQL", "POSTGRES", "MONGODB"]),
-  host: z.string().min(1, "Host is required"),
-  port: z.number().int().min(1).max(65535),
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
-  databaseName: z.string().min(1, "Database name is required"),
+  type: z.enum(["MYSQL", "POSTGRES", "MONGODB", "REDIS", "CASSANDRA", "ELASTICSEARCH", "INFLUXDB", "NEO4J", "SQLITE", "H2"]),
+  host: z.string().optional(),
+  port: z.number().int().min(1).max(65535).optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  databaseName: z.string().min(1, "Database name/path is required"),
+}).refine((data) => {
+  // SQLite and H2 (file-based) don't require host/port
+  if (data.type === "SQLITE") {
+    return true; // No host/port needed
+  }
+  // H2 file-based doesn't need host/port, but server-based does
+  if (data.type === "H2" && data.databaseName?.startsWith("jdbc:h2:file:")) {
+    return true; // File-based H2
+  }
+  // Redis doesn't require username/password (optional)
+  if (data.type === "REDIS") {
+    return data.host && data.port; // Host and port required
+  }
+  // All other types require host and port
+  return data.host && data.port;
+}, {
+  message: "Host and port are required for this database type",
+  path: ["host"],
+}).refine((data) => {
+  // Most databases require username, except Redis (optional) and SQLite (not applicable)
+  if (data.type === "SQLITE" || data.type === "REDIS") {
+    return true;
+  }
+  // H2 file-based doesn't require username
+  if (data.type === "H2" && data.databaseName?.startsWith("jdbc:h2:file:")) {
+    return true;
+  }
+  return !!data.username;
+}, {
+  message: "Username is required for this database type",
+  path: ["username"],
+}).refine((data) => {
+  // Most databases require password, except Redis (optional) and SQLite (not applicable)
+  if (data.type === "SQLITE" || data.type === "REDIS") {
+    return true;
+  }
+  // H2 file-based doesn't require password
+  if (data.type === "H2" && data.databaseName?.startsWith("jdbc:h2:file:")) {
+    return true;
+  }
+  return !!data.password;
+}, {
+  message: "Password is required for this database type",
+  path: ["password"],
 });
 
 export const jobSchema = z.object({

@@ -59,23 +59,41 @@ export default function BackupsPage() {
   async function handleDownload(backupId: string, filename: string) {
     try {
       const response = await fetch(`/api/backups/${backupId}/download`);
+      
       if (!response.ok) {
-        toast.error("Failed to download backup");
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.error || "Failed to download backup");
         return;
+      }
+
+      // Get filename from Content-Disposition header if available
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let downloadFilename = filename;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          downloadFilename = filenameMatch[1].replace(/['"]/g, "");
+        }
       }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename;
+      a.download = downloadFilename;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      
+      // Cleanup
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 100);
+      
       toast.success("Download started");
-    } catch (error) {
-      toast.error("An error occurred");
+    } catch (error: any) {
+      console.error("Download error:", error);
+      toast.error(error.message || "An error occurred while downloading");
     }
   }
 
@@ -213,15 +231,15 @@ export default function BackupsPage() {
       </AlertDialog>
 
       <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] sm:max-w-[90vw] md:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Backup Error</DialogTitle>
             <DialogDescription>
               Error details for backup: {selectedBackup?.filename}
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4">
-            <pre className="rounded-md bg-muted p-3 md:p-4 text-xs md:text-sm overflow-auto max-h-96">
+          <div className="mt-4 flex-1 overflow-hidden">
+            <pre className="rounded-md bg-muted p-3 md:p-4 text-xs md:text-sm overflow-auto max-h-[60vh] break-words whitespace-pre-wrap break-all">
               {selectedBackup?.errorMessage || "No error message available"}
             </pre>
           </div>

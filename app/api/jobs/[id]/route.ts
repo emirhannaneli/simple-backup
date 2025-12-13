@@ -29,7 +29,16 @@ export async function GET(
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ job });
+  // Convert BigInt to string for JSON serialization
+  const serializedJob = {
+    ...job,
+    backups: job.backups.map(backup => ({
+      ...backup,
+      size: backup.size.toString(),
+    })),
+  };
+
+  return NextResponse.json({ job: serializedJob });
 }
 
 export async function PUT(
