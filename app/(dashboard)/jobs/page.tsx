@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { JobForm } from "@/components/job-form";
-import { Plus, Play, Edit, Trash2 } from "lucide-react";
+import { Plus, Play, Edit, Trash2, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { formatRelativeTime } from "@/lib/format";
 
@@ -34,6 +34,7 @@ export default function JobsPage() {
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<string | null>(null);
+  const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchJobs();
@@ -124,6 +125,17 @@ export default function JobsPage() {
     }
   }
 
+  async function handleCopyJobId(jobId: string) {
+    try {
+      await navigator.clipboard.writeText(jobId);
+      setCopiedJobId(jobId);
+      toast.success("Job ID copied to clipboard");
+      setTimeout(() => setCopiedJobId(null), 2000);
+    } catch (error) {
+      toast.error("Failed to copy job ID");
+    }
+  }
+
   if (loading) {
     return <div className="p-6">Loading...</div>;
   }
@@ -152,6 +164,7 @@ export default function JobsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Title</TableHead>
+              <TableHead>Job ID</TableHead>
               <TableHead>Datasource</TableHead>
               <TableHead>Cron Expression</TableHead>
               <TableHead>Status</TableHead>
@@ -163,7 +176,7 @@ export default function JobsPage() {
           <TableBody>
             {jobs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-muted-foreground">
                   No jobs found. Create your first job to get started.
                 </TableCell>
               </TableRow>
@@ -171,6 +184,26 @@ export default function JobsPage() {
               jobs.map((job) => (
                 <TableRow key={job.id}>
                   <TableCell className="font-medium">{job.title}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                        {job.id}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => handleCopyJobId(job.id)}
+                        title="Copy Job ID"
+                      >
+                        {copiedJobId === job.id ? (
+                          <Check className="h-3 w-3 text-green-600" />
+                        ) : (
+                          <Copy className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {job.datasource?.name} ({job.datasource?.type})
                   </TableCell>
