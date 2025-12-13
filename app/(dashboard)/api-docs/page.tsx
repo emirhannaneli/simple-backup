@@ -458,6 +458,10 @@ export default function ApiDocsPage() {
                           url: "https://example.com/webhook",
                           method: "POST",
                           events: ["JOB_SUCCESS", "JOB_FAILURE"],
+                          headers: {
+                            "Authorization": "Bearer token",
+                            "X-Custom-Header": "value"
+                          },
                           isActive: true,
                           createdAt: "2024-01-01T00:00:00.000Z",
                         },
@@ -488,12 +492,85 @@ export default function ApiDocsPage() {
                       url: "https://example.com/webhook",
                       method: "POST",
                       events: ["JOB_SUCCESS", "JOB_FAILURE"],
+                      headers: {
+                        "Authorization": "Bearer token",
+                        "X-Custom-Header": "value"
+                      },
                       isActive: true,
                     },
                     null,
                     2
                   )}
                 />
+              </div>
+              <div>
+                <h3 className="font-semibold mb-2">Request Fields</h3>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  <li><code className="bg-muted px-1 rounded">url</code> (required): Webhook endpoint URL</li>
+                  <li><code className="bg-muted px-1 rounded">method</code> (optional): HTTP method (GET, POST, PUT, PATCH) - default: POST</li>
+                  <li><code className="bg-muted px-1 rounded">events</code> (required): Array of events to subscribe to (JOB_SUCCESS, JOB_FAILURE)</li>
+                  <li><code className="bg-muted px-1 rounded">headers</code> (optional): Custom headers as key-value pairs (JSON object)</li>
+                  <li><code className="bg-muted px-1 rounded">isActive</code> (optional): Whether the webhook is active - default: true</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-2">Webhook Payload</h3>
+                <p className="text-sm text-muted-foreground mb-2">
+                  When a backup job completes, webhooks receive the following payload:
+                </p>
+                <CodeBlock
+                  code={JSON.stringify(
+                    {
+                      event: "JOB_SUCCESS",
+                      jobId: "cmj3hnfsc0006fupg0tp4c6xf",
+                      jobName: "Daily MySQL Backup",
+                      timestamp: "2024-01-15T10:30:00.000Z",
+                      details: {
+                        file: "Daily_MySQL_Backup_2024-01-15T10-30-00-000Z.sql",
+                        size: "15.2 MB"
+                      }
+                    },
+                    null,
+                    2
+                  )}
+                />
+              </div>
+              <div>
+                <h3 className="font-semibold mb-2">Custom Headers</h3>
+                <p className="text-sm text-muted-foreground mb-2">
+                  You can add custom headers to webhook requests. These headers will be merged with the default <code className="bg-muted px-1 rounded">Content-Type: application/json</code> header.
+                </p>
+                <CodeBlock
+                  code={JSON.stringify(
+                    {
+                      "Authorization": "Bearer your-token-here",
+                      "X-API-Key": "your-api-key",
+                      "X-Custom-Header": "custom-value"
+                    },
+                    null,
+                    2
+                  )}
+                />
+                <div className="mt-3 space-y-2">
+                  <h4 className="font-semibold text-sm">Environment Variable Support</h4>
+                  <p className="text-sm text-muted-foreground">
+                    You can use environment variables in header values using <code className="bg-muted px-1 rounded">${`{VAR_NAME}`}</code> or <code className="bg-muted px-1 rounded">$VAR_NAME</code> syntax:
+                  </p>
+                  <CodeBlock
+                    code={JSON.stringify(
+                      {
+                        "Authorization": "Bearer ${WEBHOOK_TOKEN}",
+                        "X-API-Key": "$API_KEY",
+                        "X-Environment": "${NODE_ENV}"
+                      },
+                      null,
+                      2
+                    )}
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Environment variables are resolved at runtime when the webhook is triggered. If a variable is not found, the original string (including the variable syntax) will be used.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -506,6 +583,31 @@ export default function ApiDocsPage() {
               </div>
               <CardDescription className="text-sm">Update a webhook (requires authentication)</CardDescription>
             </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <h3 className="font-semibold mb-2">Request Body</h3>
+                <CodeBlock
+                  code={JSON.stringify(
+                    {
+                      url: "https://example.com/webhook",
+                      method: "POST",
+                      events: ["JOB_SUCCESS"],
+                      headers: {
+                        "Authorization": "Bearer token"
+                      },
+                      isActive: true,
+                    },
+                    null,
+                    2
+                  )}
+                />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  Same fields as POST /api/webhooks. All fields are optional for updates.
+                </p>
+              </div>
+            </CardContent>
           </Card>
 
           <Card>

@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { resolveHeaders } from "./env-resolver";
 
 export type WebhookEvent = "JOB_SUCCESS" | "JOB_FAILURE";
 
@@ -42,11 +43,30 @@ export async function triggerWebhooks(
         return;
       }
 
+      // Parse custom headers if available
+      const customHeaders: Record<string, string> = {};
+      if (webhook.headers) {
+        try {
+          const parsedHeaders = JSON.parse(webhook.headers) as Record<string, string>;
+          Object.assign(customHeaders, parsedHeaders);
+        } catch (error) {
+          console.warn(`Failed to parse headers for webhook ${webhook.id}:`, error);
+        }
+      }
+
+      // Resolve environment variables in headers
+      const resolvedHeaders = resolveHeaders(customHeaders);
+
+      // Merge custom headers with default headers
+      // Custom headers can override default Content-Type
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...resolvedHeaders,
+      };
+
       const response = await fetch(webhook.url, {
         method: webhook.method,
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(payload),
       });
 

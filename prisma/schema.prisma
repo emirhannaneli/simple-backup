@@ -84,6 +84,7 @@ model Webhook {
   url       String
   method    String   @default("POST")
   events    String   // JSON array of event types
+  headers   String?  // JSON object of custom headers (key-value pairs)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 

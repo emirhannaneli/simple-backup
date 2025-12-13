@@ -23,6 +23,7 @@ export async function PUT(
         url: validated.url,
         method: validated.method,
         events: JSON.stringify(validated.events),
+        headers: validated.headers ? JSON.stringify(validated.headers) : null,
         isActive: validated.isActive,
       },
     });
@@ -31,6 +32,7 @@ export async function PUT(
       webhook: {
         ...webhook,
         events: JSON.parse(webhook.events),
+        headers: webhook.headers ? JSON.parse(webhook.headers) : undefined,
       },
     });
   } catch (error: any) {

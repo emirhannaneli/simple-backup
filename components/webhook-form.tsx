@@ -25,6 +25,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { Plus, X } from "lucide-react";
 
 import type { WebhookWithEvents } from "@/lib/types";
 
@@ -35,8 +36,14 @@ interface WebhookFormProps {
   onSuccess: () => void;
 }
 
+interface HeaderPair {
+  key: string;
+  value: string;
+}
+
 export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookFormProps) {
   const [loading, setLoading] = useState(false);
+  const [headerPairs, setHeaderPairs] = useState<HeaderPair[]>([]);
 
   const {
     register,
@@ -51,12 +58,14 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
       url: "",
       method: "POST" as const,
       events: [] as ("JOB_SUCCESS" | "JOB_FAILURE")[],
+      headers: {} as Record<string, string>,
       isActive: true,
     },
   });
 
   const isActive = watch("isActive");
   const events = watch("events");
+  const headers = watch("headers") || {};
 
   useEffect(() => {
     if (open) {
@@ -72,17 +81,41 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
             e === "JOB_SUCCESS" || e === "JOB_FAILURE"
           );
         }
+        
+        let parsedHeaders: Record<string, string> = {};
+        if (webhook.headers) {
+          if (typeof webhook.headers === "object") {
+            parsedHeaders = webhook.headers;
+          } else {
+            try {
+              parsedHeaders = JSON.parse(webhook.headers);
+            } catch {
+              parsedHeaders = {};
+            }
+          }
+        }
+        
+        // Convert headers object to array of pairs
+        const pairs: HeaderPair[] = Object.entries(parsedHeaders).map(([key, value]) => ({
+          key,
+          value,
+        }));
+        setHeaderPairs(pairs.length > 0 ? pairs : [{ key: "", value: "" }]);
+        
         reset({
           url: webhook.url,
           method: webhook.method as "GET" | "POST" | "PUT" | "PATCH",
           events: parsedEvents,
+          headers: parsedHeaders,
           isActive: webhook.isActive,
         });
       } else {
+        setHeaderPairs([{ key: "", value: "" }]);
         reset({
           url: "",
           method: "POST",
           events: [],
+          headers: {},
           isActive: true,
         });
       }
@@ -101,7 +134,33 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
     }
   }
 
-  const onSubmit = async (data: { url: string; method: "GET" | "POST" | "PUT" | "PATCH"; events: ("JOB_SUCCESS" | "JOB_FAILURE")[]; isActive: boolean }) => {
+  // Convert header pairs to object and update form
+  useEffect(() => {
+    const headersObj: Record<string, string> = {};
+    headerPairs.forEach((pair) => {
+      if (pair.key.trim()) {
+        headersObj[pair.key.trim()] = pair.value;
+      }
+    });
+    setValue("headers", headersObj);
+  }, [headerPairs, setValue]);
+
+  function addHeaderPair() {
+    setHeaderPairs([...headerPairs, { key: "", value: "" }]);
+  }
+
+  function removeHeaderPair(index: number) {
+    const newPairs = headerPairs.filter((_, i) => i !== index);
+    setHeaderPairs(newPairs.length > 0 ? newPairs : [{ key: "", value: "" }]);
+  }
+
+  function updateHeaderPair(index: number, field: "key" | "value", value: string) {
+    const newPairs = [...headerPairs];
+    newPairs[index] = { ...newPairs[index], [field]: value };
+    setHeaderPairs(newPairs);
+  }
+
+  const onSubmit = async (data: { url: string; method: "GET" | "POST" | "PUT" | "PATCH"; events: ("JOB_SUCCESS" | "JOB_FAILURE")[]; headers?: Record<string, string>; isActive: boolean }) => {
     setLoading(true);
     try {
       const url = webhook ? `/api/webhooks/${webhook.id}` : "/api/webhooks";
@@ -195,6 +254,60 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
             </div>
             {errors.events && (
               <p className="text-sm text-destructive">{errors.events.message as string}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Custom Headers</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addHeaderPair}
+                className="h-7"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Add Header
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {headerPairs.map((pair, index) => (
+                <div key={index} className="flex gap-2 items-start">
+                  <div className="flex-1 space-y-1">
+                    <Input
+                      placeholder="Header name (e.g., Authorization)"
+                      value={pair.key}
+                      onChange={(e) => updateHeaderPair(index, "key", e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <Input
+                      placeholder='Value (e.g., Bearer ${WEBHOOK_TOKEN})'
+                      value={pair.value}
+                      onChange={(e) => updateHeaderPair(index, "value", e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeHeaderPair(index)}
+                    className="h-9 w-9 shrink-0"
+                    disabled={headerPairs.length === 1}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Optional: Add custom headers. Use <code className="bg-muted px-1 rounded">${`{ENV_VAR}`}</code> or <code className="bg-muted px-1 rounded">$ENV_VAR</code> to reference environment variables.
+            </p>
+            {errors.headers && (
+              <p className="text-sm text-destructive">
+                {typeof errors.headers.message === "string" ? errors.headers.message : "Invalid headers format"}
+              </p>
             )}
           </div>
 

@@ -79,6 +79,7 @@ export const webhookSchema = z.object({
   url: z.string().url("Invalid URL"),
   method: z.enum(["GET", "POST", "PUT", "PATCH"]).default("POST"),
   events: z.array(z.enum(["JOB_SUCCESS", "JOB_FAILURE"])).min(1, "At least one event is required"),
+  headers: z.record(z.string(), z.string()).optional(), // Key-value pairs for custom headers
   isActive: z.boolean().default(true),
 });
 

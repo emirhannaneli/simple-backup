@@ -15,13 +15,14 @@ export async function GET() {
     },
   });
 
-  // Parse events JSON
-  const webhooksWithParsedEvents = webhooks.map((webhook: { events: string; [key: string]: any }) => ({
+  // Parse events and headers JSON
+  const webhooksWithParsedData = webhooks.map((webhook: { events: string; headers?: string | null; [key: string]: any }) => ({
     ...webhook,
     events: JSON.parse(webhook.events),
+    headers: webhook.headers ? JSON.parse(webhook.headers) : undefined,
   }));
 
-  return NextResponse.json({ webhooks: webhooksWithParsedEvents });
+  return NextResponse.json({ webhooks: webhooksWithParsedData });
 }
 
 export async function POST(request: Request) {
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
         url: validated.url,
         method: validated.method,
         events: JSON.stringify(validated.events),
+        headers: validated.headers ? JSON.stringify(validated.headers) : null,
         isActive: validated.isActive,
       },
     });
@@ -48,6 +50,7 @@ export async function POST(request: Request) {
         webhook: {
           ...webhook,
           events: JSON.parse(webhook.events),
+          headers: webhook.headers ? JSON.parse(webhook.headers) : undefined,
         },
       },
       { status: 201 }
