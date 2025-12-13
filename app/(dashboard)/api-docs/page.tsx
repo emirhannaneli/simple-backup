@@ -521,13 +521,15 @@ export default function ApiDocsPage() {
                 <CodeBlock
                   code={JSON.stringify(
                     {
-                      event: "JOB_SUCCESS",
-                      jobId: "cmj3hnfsc0006fupg0tp4c6xf",
-                      jobName: "Daily MySQL Backup",
-                      timestamp: "2024-01-15T10:30:00.000Z",
-                      details: {
-                        file: "Daily_MySQL_Backup_2024-01-15T10-30-00-000Z.sql",
-                        size: "15.2 MB"
+                      event_type: "backup-webhook",
+                      client_payload: {
+                        jobId: "cmj3hnfsc0006fupg0tp4c6xf",
+                        event: "JOB_SUCCESS",
+                        details: {
+                          file: "Daily_MySQL_Backup_2024-01-15T10-30-00-000Z.sql",
+                          size: "15.2 MB",
+                          error: null
+                        }
                       }
                     },
                     null,

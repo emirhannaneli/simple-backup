@@ -49,6 +49,7 @@ export async function POST(request: Request) {
         datasourceId: validated.datasourceId,
         cronExpression: validated.cronExpression,
         destinationPath: validated.destinationPath,
+        timezone: validated.timezone || "UTC",
         isActive: validated.isActive,
       },
       include: {

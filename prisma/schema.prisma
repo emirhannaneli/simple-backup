@@ -44,6 +44,7 @@ model Job {
   datasource      Datasource  @relation(fields: [datasourceId], references: [id], onDelete: Cascade)
   cronExpression  String
   destinationPath String
+  timezone        String   @default("UTC") // IANA timezone identifier (e.g., "America/New_York", "Europe/Istanbul")
   status          String   @default("IDLE") // IDLE, RUNNING, or ERROR
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
@@ -88,6 +89,28 @@ model Webhook {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
+  logs      WebhookLog[]
+
   @@map("webhooks")
+}
+
+model WebhookLog {
+  id          String   @id @default(cuid())
+  webhookId   String
+  webhook     Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event       String   // JOB_SUCCESS or JOB_FAILURE
+  jobId       String?
+  jobName     String?
+  statusCode  Int?     // HTTP status code from webhook response
+  success     Boolean  // Whether the webhook request was successful
+  requestBody String   // JSON string of the request payload
+  responseBody String? // Response body from webhook endpoint
+  errorMessage String? // Error message if request failed
+  durationMs   Int?    // Request duration in milliseconds
+  createdAt    DateTime @default(now())
+
+  @@map("webhook_logs")
+  @@index([webhookId])
+  @@index([createdAt])
 }
 

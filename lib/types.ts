@@ -45,6 +45,7 @@ export interface JobFormData {
   datasourceId: string;
   cronExpression: string;
   destinationPath: string;
+  timezone: string;
   isActive: boolean;
 }
 

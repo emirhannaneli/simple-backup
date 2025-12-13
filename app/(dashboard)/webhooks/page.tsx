@@ -22,9 +22,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { WebhookForm } from "@/components/webhook-form";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { formatRelativeTime } from "@/lib/format";
+import { WebhookLogsDialog } from "@/components/webhook-logs-dialog";
 
 export default function WebhooksPage() {
   const [webhooks, setWebhooks] = useState<any[]>([]);
@@ -33,6 +34,8 @@ export default function WebhooksPage() {
   const [selectedWebhook, setSelectedWebhook] = useState<any>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [webhookToDelete, setWebhookToDelete] = useState<string | null>(null);
+  const [logsDialogOpen, setLogsDialogOpen] = useState(false);
+  const [webhookForLogs, setWebhookForLogs] = useState<string | null>(null);
 
   useEffect(() => {
     fetchWebhooks();
@@ -148,6 +151,17 @@ export default function WebhooksPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => {
+                            setWebhookForLogs(webhook.id);
+                            setLogsDialogOpen(true);
+                          }}
+                          title="View Logs"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
                             setSelectedWebhook(webhook);
                             setFormOpen(true);
                           }}
@@ -197,6 +211,12 @@ export default function WebhooksPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <WebhookLogsDialog
+        open={logsDialogOpen}
+        onOpenChange={setLogsDialogOpen}
+        webhookId={webhookForLogs}
+      />
     </div>
   );
 }

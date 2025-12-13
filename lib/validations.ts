@@ -68,6 +68,7 @@ export const jobSchema = z.object({
     "Invalid cron expression"
   ),
   destinationPath: z.string().min(1, "Destination path is required"),
+  timezone: z.string().default("UTC"),
   isActive: z.boolean().default(true),
 });
 

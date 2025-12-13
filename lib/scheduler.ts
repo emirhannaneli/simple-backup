@@ -26,31 +26,37 @@ class SchedulerService {
 
     // Schedule each job
     for (const job of activeJobs) {
-      this.scheduleJob(job.id, job.cronExpression);
+      this.scheduleJob(job.id, job.cronExpression, job.timezone || "UTC");
     }
 
     console.log(`Scheduled ${activeJobs.length} jobs`);
   }
 
-  scheduleJob(jobId: string, cronExpression: string) {
+  scheduleJob(jobId: string, cronExpression: string, timezone: string = "UTC") {
     // Cancel existing job if any
     this.cancelJob(jobId);
 
-    // Create new scheduled job
-    const scheduledJob = schedule.scheduleJob(cronExpression, async () => {
-      try {
-        console.log(`Executing scheduled backup for job: ${jobId}`);
-        await executeBackup(jobId);
-      } catch (error) {
-        console.error(`Error executing backup for job ${jobId}:`, error);
+    // Create new scheduled job with timezone
+    const scheduledJob = schedule.scheduleJob(
+      {
+        rule: cronExpression,
+        tz: timezone,
+      },
+      async () => {
+        try {
+          console.log(`Executing scheduled backup for job: ${jobId} (timezone: ${timezone})`);
+          await executeBackup(jobId);
+        } catch (error) {
+          console.error(`Error executing backup for job ${jobId}:`, error);
+        }
       }
-    });
+    );
 
     if (scheduledJob) {
       this.jobs.set(jobId, scheduledJob);
-      console.log(`Scheduled job ${jobId} with cron: ${cronExpression}`);
+      console.log(`Scheduled job ${jobId} with cron: ${cronExpression} (timezone: ${timezone})`);
     } else {
-      console.error(`Failed to schedule job ${jobId} with invalid cron: ${cronExpression}`);
+      console.error(`Failed to schedule job ${jobId} with invalid cron: ${cronExpression} or timezone: ${timezone}`);
     }
   }
 

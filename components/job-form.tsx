@@ -25,6 +25,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { CronHelper } from "@/components/cron-helper";
+import { TIMEZONES } from "@/lib/timezones";
 
 import type { JobWithDatasource } from "@/lib/types";
 
@@ -59,6 +60,7 @@ export function JobForm({ open, onOpenChange, job, onSuccess }: JobFormProps) {
       datasourceId: "",
       cronExpression: "",
       destinationPath: "",
+      timezone: "UTC",
       isActive: true,
     },
   });
@@ -74,6 +76,7 @@ export function JobForm({ open, onOpenChange, job, onSuccess }: JobFormProps) {
           datasourceId: job.datasourceId,
           cronExpression: job.cronExpression,
           destinationPath: job.destinationPath,
+          timezone: (job as any).timezone || "UTC",
           isActive: job.isActive,
         });
       } else {
@@ -82,6 +85,7 @@ export function JobForm({ open, onOpenChange, job, onSuccess }: JobFormProps) {
           datasourceId: "",
           cronExpression: "",
           destinationPath: "",
+          timezone: "UTC",
           isActive: true,
         });
       }
@@ -98,7 +102,7 @@ export function JobForm({ open, onOpenChange, job, onSuccess }: JobFormProps) {
     }
   }
 
-  const onSubmit = async (data: { title: string; datasourceId: string; cronExpression: string; destinationPath: string; isActive: boolean }) => {
+  const onSubmit = async (data: { title: string; datasourceId: string; cronExpression: string; destinationPath: string; timezone: string; isActive: boolean }) => {
     setLoading(true);
     try {
       const url = job ? `/api/jobs/${job.id}` : "/api/jobs";
@@ -194,6 +198,33 @@ export function JobForm({ open, onOpenChange, job, onSuccess }: JobFormProps) {
                 {errors.destinationPath.message as string}
               </p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="timezone">Timezone</Label>
+            <Select
+              value={watch("timezone")}
+              onValueChange={(value) => setValue("timezone", value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select timezone" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                {TIMEZONES.map((tz) => (
+                  <SelectItem key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.timezone && (
+              <p className="text-sm text-destructive">
+                {errors.timezone.message as string}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              The cron schedule will run according to the selected timezone.
+            </p>
           </div>
 
           <div className="flex items-center space-x-2">

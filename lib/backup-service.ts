@@ -151,15 +151,22 @@ export async function executeBackup(jobId: string): Promise<void> {
     });
 
     // Trigger webhooks
-    if (isSuccess) {
-      await triggerWebhooks("JOB_SUCCESS", job.id, job.title, {
-        file: filename,
-        size: formatBytes(fileSize),
-      });
-    } else {
-      await triggerWebhooks("JOB_FAILURE", job.id, job.title, {
-        error: result.stderr || "Backup failed",
-      });
+    try {
+      if (isSuccess) {
+        console.log(`🔔 Triggering JOB_SUCCESS webhook for job ${job.id}`);
+        await triggerWebhooks("JOB_SUCCESS", job.id, job.title, {
+          file: filename,
+          size: formatBytes(fileSize),
+        });
+      } else {
+        console.log(`🔔 Triggering JOB_FAILURE webhook for job ${job.id}`);
+        await triggerWebhooks("JOB_FAILURE", job.id, job.title, {
+          error: result.stderr || "Backup failed",
+        });
+      }
+    } catch (webhookError) {
+      console.error(`❌ Error triggering webhooks for job ${job.id}:`, webhookError);
+      // Don't throw - webhook errors shouldn't fail the backup
     }
   } catch (error: unknown) {
     const endTime = Date.now();
@@ -197,9 +204,15 @@ export async function executeBackup(jobId: string): Promise<void> {
     }
 
     // Trigger failure webhook
-    await triggerWebhooks("JOB_FAILURE", job.id, job.title, {
-      error: (error as { message?: string }).message || "Unknown error",
-    });
+    try {
+      console.log(`🔔 Triggering JOB_FAILURE webhook for job ${job.id} (exception)`);
+      await triggerWebhooks("JOB_FAILURE", job.id, job.title, {
+        error: (error as { message?: string }).message || "Unknown error",
+      });
+    } catch (webhookError) {
+      console.error(`❌ Error triggering webhooks for job ${job.id}:`, webhookError);
+      // Don't throw - webhook errors shouldn't fail the backup
+    }
 
     throw error;
   }

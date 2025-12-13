@@ -62,6 +62,7 @@ export async function PUT(
         datasourceId: validated.datasourceId,
         cronExpression: validated.cronExpression,
         destinationPath: validated.destinationPath,
+        timezone: validated.timezone || "UTC",
         isActive: validated.isActive,
       },
       include: {
