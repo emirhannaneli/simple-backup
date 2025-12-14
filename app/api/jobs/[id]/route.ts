@@ -17,7 +17,11 @@ export async function GET(
   const job = await prisma.job.findUnique({
     where: { id },
     include: {
-      datasource: true,
+      datasources: {
+        include: {
+          datasource: true,
+        },
+      },
       backups: {
         take: 10,
         orderBy: { createdAt: "desc" },
@@ -29,9 +33,15 @@ export async function GET(
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
 
+  if (!job) {
+    return NextResponse.json({ error: "Job not found" }, { status: 404 });
+  }
+
   // Convert BigInt to string for JSON serialization
   const serializedJob = {
     ...job,
+    datasource: job.datasources[0]?.datasource || null, // First datasource for backward compatibility
+    datasourceIds: job.datasources.map(jd => jd.datasourceId), // Array of datasource IDs
     backups: job.backups.map(backup => ({
       ...backup,
       size: backup.size.toString(),
@@ -55,32 +65,52 @@ export async function PUT(
     const body = await request.json();
     const validated = jobSchema.parse(body);
 
+    // First, delete existing job-datasource relationships
+    await prisma.jobDatasource.deleteMany({
+      where: { jobId: id },
+    });
+
+    // Then update job and create new relationships
     const job = await prisma.job.update({
       where: { id },
       data: {
         title: validated.title,
-        datasourceId: validated.datasourceId,
         cronExpression: validated.cronExpression,
         destinationPath: validated.destinationPath,
         timezone: validated.timezone || "UTC",
         isActive: validated.isActive,
+        datasources: {
+          create: validated.datasourceIds.map(datasourceId => ({
+            datasourceId,
+          })),
+        },
       },
       include: {
-        datasource: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
+        datasources: {
+          include: {
+            datasource: {
+              select: {
+                id: true,
+                name: true,
+                type: true,
+              },
+            },
           },
         },
       },
     });
 
+    // Transform for backward compatibility
+    const jobWithDatasource = {
+      ...job,
+      datasource: job.datasources[0]?.datasource || null,
+    };
+
     // Refresh scheduler
     const scheduler = getScheduler();
     await scheduler.refresh();
 
-    return NextResponse.json({ job });
+    return NextResponse.json({ job: jobWithDatasource });
   } catch (error: any) {
     console.error("Update job error:", error);
     return NextResponse.json(

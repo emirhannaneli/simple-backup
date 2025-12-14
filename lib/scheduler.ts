@@ -20,7 +20,11 @@ class SchedulerService {
         isActive: true,
       },
       include: {
-        datasource: true,
+        datasources: {
+          include: {
+            datasource: true,
+          },
+        },
       },
     });
 

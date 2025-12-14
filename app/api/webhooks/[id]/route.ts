@@ -20,10 +20,13 @@ export async function PUT(
     const webhook = await prisma.webhook.update({
       where: { id },
       data: {
+        name: validated.name,
         url: validated.url,
         method: validated.method,
         events: JSON.stringify(validated.events),
+        jobIds: validated.jobIds && validated.jobIds.length > 0 ? JSON.stringify(validated.jobIds) : null,
         headers: validated.headers ? JSON.stringify(validated.headers) : null,
+        payload: validated.payload && validated.payload.trim() !== "" ? validated.payload : null,
         isActive: validated.isActive,
       },
     });
@@ -32,7 +35,9 @@ export async function PUT(
       webhook: {
         ...webhook,
         events: JSON.parse(webhook.events),
+        jobIds: webhook.jobIds ? JSON.parse(webhook.jobIds) : null,
         headers: webhook.headers ? JSON.parse(webhook.headers) : undefined,
+        payload: webhook.payload || null,
       },
     });
   } catch (error: any) {

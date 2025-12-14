@@ -12,11 +12,15 @@ export async function GET() {
 
   const jobs = await prisma.job.findMany({
     include: {
-      datasource: {
-        select: {
-          id: true,
-          name: true,
-          type: true,
+      datasources: {
+        include: {
+          datasource: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+            },
+          },
         },
       },
       _count: {
@@ -30,7 +34,13 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json({ jobs });
+  // Transform datasources to match old format for backward compatibility
+  const jobsWithDatasource = jobs.map(job => ({
+    ...job,
+    datasource: job.datasources[0]?.datasource || null, // First datasource for backward compatibility
+  }));
+
+  return NextResponse.json({ jobs: jobsWithDatasource });
 }
 
 export async function POST(request: Request) {
@@ -46,22 +56,36 @@ export async function POST(request: Request) {
     const job = await prisma.job.create({
       data: {
         title: validated.title,
-        datasourceId: validated.datasourceId,
         cronExpression: validated.cronExpression,
         destinationPath: validated.destinationPath,
         timezone: validated.timezone || "UTC",
         isActive: validated.isActive,
+        datasources: {
+          create: validated.datasourceIds.map(datasourceId => ({
+            datasourceId,
+          })),
+        },
       },
       include: {
-        datasource: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
+        datasources: {
+          include: {
+            datasource: {
+              select: {
+                id: true,
+                name: true,
+                type: true,
+              },
+            },
           },
         },
       },
     });
+
+    // Transform for backward compatibility
+    const jobWithDatasource = {
+      ...job,
+      datasource: job.datasources[0]?.datasource || null,
+    };
 
     // Refresh scheduler if job is active
     if (validated.isActive) {
@@ -69,7 +93,7 @@ export async function POST(request: Request) {
       await scheduler.refresh();
     }
 
-    return NextResponse.json({ job }, { status: 201 });
+    return NextResponse.json({ job: jobWithDatasource }, { status: 201 });
   } catch (error: any) {
     console.error("Create job error:", error);
     return NextResponse.json(

@@ -15,11 +15,13 @@ export async function GET() {
     },
   });
 
-  // Parse events and headers JSON
-  const webhooksWithParsedData = webhooks.map((webhook: { events: string; headers?: string | null; [key: string]: any }) => ({
+  // Parse events, headers, payload, and jobIds JSON
+  const webhooksWithParsedData = webhooks.map((webhook: { events: string; jobIds?: string | null; headers?: string | null; payload?: string | null; [key: string]: any }) => ({
     ...webhook,
     events: JSON.parse(webhook.events),
+    jobIds: webhook.jobIds ? JSON.parse(webhook.jobIds) : null,
     headers: webhook.headers ? JSON.parse(webhook.headers) : undefined,
+    payload: webhook.payload || null,
   }));
 
   return NextResponse.json({ webhooks: webhooksWithParsedData });
@@ -37,10 +39,13 @@ export async function POST(request: Request) {
 
     const webhook = await prisma.webhook.create({
       data: {
+        name: validated.name,
         url: validated.url,
         method: validated.method,
         events: JSON.stringify(validated.events),
+        jobIds: validated.jobIds && validated.jobIds.length > 0 ? JSON.stringify(validated.jobIds) : null,
         headers: validated.headers ? JSON.stringify(validated.headers) : null,
+        payload: validated.payload && validated.payload.trim() !== "" ? validated.payload : null,
         isActive: validated.isActive,
       },
     });
@@ -50,7 +55,9 @@ export async function POST(request: Request) {
         webhook: {
           ...webhook,
           events: JSON.parse(webhook.events),
+          jobIds: webhook.jobIds ? JSON.parse(webhook.jobIds) : null,
           headers: webhook.headers ? JSON.parse(webhook.headers) : undefined,
+          payload: webhook.payload || null,
         },
       },
       { status: 201 }

@@ -7,6 +7,7 @@ import { webhookSchema } from "@/lib/validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,7 @@ interface HeaderPair {
 export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookFormProps) {
   const [loading, setLoading] = useState(false);
   const [headerPairs, setHeaderPairs] = useState<HeaderPair[]>([]);
+  const [jobs, setJobs] = useState<Array<{ id: string; title: string }>>([]);
 
   const {
     register,
@@ -55,20 +57,26 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
   } = useForm({
     resolver: zodResolver(webhookSchema),
     defaultValues: {
+      name: "",
       url: "",
       method: "POST" as const,
       events: [] as ("JOB_SUCCESS" | "JOB_FAILURE")[],
+      jobIds: [] as string[],
       headers: {} as Record<string, string>,
+      payload: "",
       isActive: true,
     },
   });
 
   const isActive = watch("isActive");
   const events = watch("events");
+  const jobIds = watch("jobIds") || [];
   const headers = watch("headers") || {};
+  const payload = watch("payload") || "";
 
   useEffect(() => {
     if (open) {
+      fetchJobs();
       if (webhook) {
         let parsedEvents: ("JOB_SUCCESS" | "JOB_FAILURE")[];
         if (Array.isArray(webhook.events)) {
@@ -95,6 +103,33 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
           }
         }
         
+        // Parse payload if available
+        let payloadValue = "";
+        if ((webhook as any).payload) {
+          try {
+            // If it's already a string, use it; otherwise stringify it
+            payloadValue = typeof (webhook as any).payload === "string" 
+              ? (webhook as any).payload 
+              : JSON.stringify((webhook as any).payload, null, 2);
+          } catch {
+            payloadValue = "";
+          }
+        }
+
+        // Parse jobIds if available
+        let parsedJobIds: string[] = [];
+        if ((webhook as any).jobIds) {
+          if (Array.isArray((webhook as any).jobIds)) {
+            parsedJobIds = (webhook as any).jobIds;
+          } else {
+            try {
+              parsedJobIds = JSON.parse((webhook as any).jobIds || "[]");
+            } catch {
+              parsedJobIds = [];
+            }
+          }
+        }
+        
         // Convert headers object to array of pairs
         const pairs: HeaderPair[] = Object.entries(parsedHeaders).map(([key, value]) => ({
           key,
@@ -103,19 +138,25 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
         setHeaderPairs(pairs.length > 0 ? pairs : [{ key: "", value: "" }]);
         
         reset({
+          name: webhook.name || "",
           url: webhook.url,
           method: webhook.method as "GET" | "POST" | "PUT" | "PATCH",
           events: parsedEvents,
+          jobIds: parsedJobIds,
           headers: parsedHeaders,
+          payload: payloadValue,
           isActive: webhook.isActive,
         });
       } else {
         setHeaderPairs([{ key: "", value: "" }]);
         reset({
+          name: "",
           url: "",
           method: "POST",
           events: [],
+          jobIds: [],
           headers: {},
+          payload: "",
           isActive: true,
         });
       }
@@ -160,6 +201,16 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
     setHeaderPairs(newPairs);
   }
 
+  async function fetchJobs() {
+    try {
+      const res = await fetch("/api/jobs");
+      const data = await res.json();
+      setJobs(data.jobs?.map((j: any) => ({ id: j.id, title: j.title })) || []);
+    } catch (error) {
+      console.error("Error fetching jobs:", error);
+    }
+  }
+
   const onSubmit = async (data: { url: string; method: "GET" | "POST" | "PUT" | "PATCH"; events: ("JOB_SUCCESS" | "JOB_FAILURE")[]; headers?: Record<string, string>; isActive: boolean }) => {
     setLoading(true);
     try {
@@ -198,6 +249,21 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              {...register("name")}
+              placeholder="Production Backup Webhook"
+            />
+            {errors.name && (
+              <p className="text-sm text-destructive">{errors.name.message as string}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              A descriptive name for this webhook (e.g., "Production Alerts", "Backup Notifications")
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="url">URL</Label>
             <Input
@@ -258,6 +324,61 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
           </div>
 
           <div className="space-y-2">
+            <Label>Jobs (Optional)</Label>
+            <div className="space-y-2 border rounded-md p-3 max-h-[200px] overflow-y-auto">
+              {jobs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No jobs available.</p>
+              ) : (
+                <>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="job-all"
+                      checked={jobIds.length === 0}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setValue("jobIds", [], { shouldValidate: true });
+                        }
+                      }}
+                    />
+                    <Label htmlFor="job-all" className="font-normal cursor-pointer">
+                      All Jobs (default)
+                    </Label>
+                  </div>
+                  <div className="border-t pt-2 mt-2">
+                    {jobs.map((job) => (
+                      <div key={job.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`job-${job.id}`}
+                          checked={jobIds.includes(job.id)}
+                          onCheckedChange={(checked) => {
+                            const currentIds = jobIds || [];
+                            if (checked) {
+                              setValue("jobIds", [...currentIds, job.id], { shouldValidate: true });
+                            } else {
+                              setValue("jobIds", currentIds.filter(id => id !== job.id), { shouldValidate: true });
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`job-${job.id}`} className="font-normal cursor-pointer">
+                          {job.title}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            {errors.jobIds && (
+              <p className="text-sm text-destructive">
+                {errors.jobIds.message as string}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Select specific jobs to listen to. Leave empty or uncheck all to listen to all jobs.
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Custom Headers</Label>
               <Button
@@ -309,6 +430,55 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
                 {typeof errors.headers.message === "string" ? errors.headers.message : "Invalid headers format"}
               </p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="payload">Custom Payload (JSON)</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const defaultPayload = JSON.stringify({
+                    event_type: "backup-webhook",
+                    client_payload: {
+                      jobId: "${jobId}",
+                      event: "${event}",
+                      jobName: "${jobName}",
+                      details: {
+                        file: "${file}",
+                        size: "${size}",
+                        error: "${error}",
+                      },
+                      timestamp: "${timestamp}",
+                    },
+                  }, null, 2);
+                  setValue("payload", defaultPayload);
+                }}
+                className="h-7"
+              >
+                Use Default
+              </Button>
+            </div>
+            <Textarea
+              id="payload"
+              {...register("payload")}
+              placeholder='{"message": "Backup completed for job ${jobId}"}'
+              className="font-mono text-sm min-h-[200px]"
+              value={payload}
+              onChange={(e) => {
+                setValue("payload", e.target.value, { shouldValidate: true });
+              }}
+            />
+            {errors.payload && (
+              <p className="text-sm text-destructive">{errors.payload.message as string}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Optional: Customize the webhook payload. Leave empty to use default format. Available variables:
+              <br />
+              <code className="bg-muted px-1 rounded">${`{jobId}`}</code>, <code className="bg-muted px-1 rounded">${`{event}`}</code>, <code className="bg-muted px-1 rounded">${`{jobName}`}</code>, <code className="bg-muted px-1 rounded">${`{file}`}</code>, <code className="bg-muted px-1 rounded">${`{size}`}</code>, <code className="bg-muted px-1 rounded">${`{error}`}</code>, <code className="bg-muted px-1 rounded">${`{timestamp}`}</code>
+            </p>
           </div>
 
           <div className="flex items-center space-x-2">

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { CronHelper } from "@/components/cron-helper";
 import { TIMEZONES } from "@/lib/timezones";
@@ -57,7 +58,7 @@ export function JobForm({ open, onOpenChange, job, onSuccess }: JobFormProps) {
     resolver: zodResolver(jobSchema),
     defaultValues: {
       title: "",
-      datasourceId: "",
+      datasourceIds: [] as string[],
       cronExpression: "",
       destinationPath: "",
       timezone: "UTC",
@@ -66,14 +67,19 @@ export function JobForm({ open, onOpenChange, job, onSuccess }: JobFormProps) {
   });
 
   const isActive = watch("isActive");
+  const datasourceIds = watch("datasourceIds") || [];
 
   useEffect(() => {
     if (open) {
       fetchDatasources();
       if (job) {
+        // Get datasourceIds from job (could be from datasources array or datasourceIds field)
+        const jobDatasourceIds = (job as any).datasourceIds || 
+          ((job as any).datasources?.map((jd: any) => jd.datasourceId) || []);
+        
         reset({
           title: job.title,
-          datasourceId: job.datasourceId,
+          datasourceIds: jobDatasourceIds,
           cronExpression: job.cronExpression,
           destinationPath: job.destinationPath,
           timezone: (job as any).timezone || "UTC",
@@ -82,7 +88,7 @@ export function JobForm({ open, onOpenChange, job, onSuccess }: JobFormProps) {
       } else {
         reset({
           title: "",
-          datasourceId: "",
+          datasourceIds: [],
           cronExpression: "",
           destinationPath: "",
           timezone: "UTC",
@@ -102,7 +108,7 @@ export function JobForm({ open, onOpenChange, job, onSuccess }: JobFormProps) {
     }
   }
 
-  const onSubmit = async (data: { title: string; datasourceId: string; cronExpression: string; destinationPath: string; timezone: string; isActive: boolean }) => {
+  const onSubmit = async (data: { title: string; datasourceIds: string[]; cronExpression: string; destinationPath: string; timezone: string; isActive: boolean }) => {
     setLoading(true);
     try {
       const url = job ? `/api/jobs/${job.id}` : "/api/jobs";
@@ -149,27 +155,40 @@ export function JobForm({ open, onOpenChange, job, onSuccess }: JobFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="datasourceId">Datasource</Label>
-            <Select
-              value={watch("datasourceId")}
-              onValueChange={(value) => setValue("datasourceId", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select datasource" />
-              </SelectTrigger>
-              <SelectContent>
-                {datasources.map((ds) => (
-                  <SelectItem key={ds.id} value={ds.id}>
-                    {ds.name} ({ds.type})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.datasourceId && (
+            <Label>Datasources</Label>
+            <div className="space-y-2 border rounded-md p-3 max-h-[200px] overflow-y-auto">
+              {datasources.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No datasources available. Create a datasource first.</p>
+              ) : (
+                datasources.map((ds) => (
+                  <div key={ds.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`datasource-${ds.id}`}
+                      checked={datasourceIds.includes(ds.id)}
+                      onCheckedChange={(checked) => {
+                        const currentIds = datasourceIds || [];
+                        if (checked) {
+                          setValue("datasourceIds", [...currentIds, ds.id], { shouldValidate: true });
+                        } else {
+                          setValue("datasourceIds", currentIds.filter(id => id !== ds.id), { shouldValidate: true });
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`datasource-${ds.id}`} className="font-normal cursor-pointer">
+                      {ds.name} ({ds.type})
+                    </Label>
+                  </div>
+                ))
+              )}
+            </div>
+            {errors.datasourceIds && (
               <p className="text-sm text-destructive">
-                {errors.datasourceId.message as string}
+                {errors.datasourceIds.message as string}
               </p>
             )}
+            <p className="text-xs text-muted-foreground">
+              Select one or more datasources to backup in this job.
+            </p>
           </div>
 
           <div className="space-y-2">

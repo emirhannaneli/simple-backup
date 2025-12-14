@@ -32,7 +32,7 @@ model Datasource {
   databaseName    String
   createdAt       DateTime @default(now())
 
-  jobs            Job[]
+  jobs            JobDatasource[]
 
   @@map("datasources")
 }
@@ -40,8 +40,6 @@ model Datasource {
 model Job {
   id              String   @id @default(cuid())
   title           String
-  datasourceId    String
-  datasource      Datasource  @relation(fields: [datasourceId], references: [id], onDelete: Cascade)
   cronExpression  String
   destinationPath String
   timezone        String   @default("UTC") // IANA timezone identifier (e.g., "America/New_York", "Europe/Istanbul")
@@ -49,9 +47,22 @@ model Job {
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
 
+  datasources     JobDatasource[]
   backups         Backup[]
 
   @@map("jobs")
+}
+
+model JobDatasource {
+  id           String     @id @default(cuid())
+  jobId        String
+  job          Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  datasourceId String
+  datasource   Datasource @relation(fields: [datasourceId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([jobId, datasourceId])
+  @@map("job_datasources")
 }
 
 model Backup {
@@ -82,10 +93,13 @@ model ApiKey {
 
 model Webhook {
   id        String   @id @default(cuid())
+  name      String   // Webhook name/description
   url       String
   method    String   @default("POST")
   events    String   // JSON array of event types
+  jobIds    String?  // JSON array of job IDs to listen to (null/empty = all jobs)
   headers   String?  // JSON object of custom headers (key-value pairs)
+  payload   String?  // JSON string of custom payload template (supports variables like ${jobId}, ${event}, etc.)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 

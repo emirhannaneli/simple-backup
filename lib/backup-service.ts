@@ -30,10 +30,16 @@ export async function ensureBackupDirectory(dirPath: string): Promise<void> {
 export async function executeBackup(jobId: string): Promise<void> {
   const startTime = Date.now();
 
-  // Fetch job with datasource
+  // Fetch job with datasources
   const job = await prisma.job.findUnique({
     where: { id: jobId },
-    include: { datasource: true },
+    include: {
+      datasources: {
+        include: {
+          datasource: true,
+        },
+      },
+    },
   });
 
   if (!job) {
@@ -44,177 +50,202 @@ export async function executeBackup(jobId: string): Promise<void> {
     throw new Error(`Job is not active: ${jobId}`);
   }
 
+  if (!job.datasources || job.datasources.length === 0) {
+    throw new Error(`Job has no datasources: ${jobId}`);
+  }
+
   // Update job status to RUNNING
   await prisma.job.update({
     where: { id: jobId },
     data: { status: "RUNNING" },
   });
 
-  let backupRecord;
-  let filePath = "";
-  let filename = "";
+  // Create job-specific directory: BACKUP_BASE_PATH/{destinationPath}
+  const backupBasePath = BACKUP_BASE_PATH || "/data/backups";
+  let sanitizedPath = job.destinationPath.trim().replace(/^\/+|\/+$/g, "").replace(/\\/g, "/");
+  sanitizedPath = sanitizedPath.replace(/[<>:"|?*\x00-\x1f]/g, "_");
+  if (!sanitizedPath || sanitizedPath.length === 0) {
+    sanitizedPath = `job-${job.id}`;
+  }
+  const jobBackupDir = path.join(backupBasePath, sanitizedPath);
+  await ensureBackupDirectory(backupBasePath);
+  await ensureBackupDirectory(jobBackupDir);
+  console.log(`📦 Creating backups in: ${jobBackupDir}`);
 
-  try {
-    // Decrypt datasource password
-    const decryptedPassword = decrypt(job.datasource.passwordEncrypted);
+  // Backup each datasource
+  const backupResults: Array<{ success: boolean; datasourceName: string; filename?: string; error?: string }> = [];
+  let allSuccess = true;
+  let anySuccess = false;
 
-    // Prepare connection info
-    const conn: DatabaseConnection = {
-      type: job.datasource.type as DatabaseConnection["type"],
-      host: job.datasource.host || undefined,
-      port: job.datasource.port || undefined,
-      username: job.datasource.username || undefined,
-      password: decryptedPassword || undefined,
-      databaseName: job.datasource.databaseName,
-    };
+  for (const jobDatasource of job.datasources) {
+    const datasource = jobDatasource.datasource;
+    const datasourceStartTime = Date.now();
+    let backupRecord;
+    let filePath = "";
+    let filename = "";
 
-    // Create job-specific directory: BACKUP_BASE_PATH/{destinationPath}
-    // Use the destinationPath from job configuration
-    // Ensure BACKUP_BASE_PATH is /data/backups (or configured path)
-    const backupBasePath = BACKUP_BASE_PATH || "/data/backups";
-    
-    // Sanitize destinationPath to make it filesystem-safe
-    // Remove leading/trailing slashes and normalize path separators
-    let sanitizedPath = job.destinationPath.trim().replace(/^\/+|\/+$/g, "").replace(/\\/g, "/");
-    
-    // Replace invalid characters with underscores
-    sanitizedPath = sanitizedPath.replace(/[<>:"|?*\x00-\x1f]/g, "_");
-    
-    // If destinationPath is empty or invalid, use job ID as fallback
-    if (!sanitizedPath || sanitizedPath.length === 0) {
-      sanitizedPath = `job-${job.id}`;
-    }
-    
-    // Build full backup directory path
-    const jobBackupDir = path.join(backupBasePath, sanitizedPath);
-    
-    // Ensure backup base directory exists first
-    await ensureBackupDirectory(backupBasePath);
-    // Then ensure job-specific directory exists (recursive for nested paths)
-    await ensureBackupDirectory(jobBackupDir);
-    
-    console.log(`📦 Creating backup in: ${jobBackupDir}`);
-
-    // Generate filename
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const extension = getFileExtension(job.datasource.type as DatabaseConnection["type"]);
-    filename = `${job.title.replace(/[^a-zA-Z0-9]/g, "_")}_${timestamp}.${extension}`;
-    filePath = path.join(jobBackupDir, filename);
-
-    // Create backup record
-    backupRecord = await prisma.backup.create({
-      data: {
-        jobId: job.id,
-        filename,
-        filePath,
-        size: BigInt(0),
-        status: "FAILED", // Will update on success
-        durationMs: 0,
-      },
-    });
-
-    // Execute backup command
-    const result = await executeBackupCommand(conn, filePath);
-
-    const endTime = Date.now();
-    const durationMs = endTime - startTime;
-
-    // Check if file was created and get size
-    let fileSize = BigInt(0);
     try {
-      const stats = await fs.stat(filePath);
-      fileSize = BigInt(stats.size);
-    } catch {
-      // File doesn't exist, backup failed
-    }
+      console.log(`📦 Starting backup for datasource: ${datasource.name} (${datasource.type})`);
 
-    // Check if backup was successful
-    const isSuccess = fileSize > 0 && result.stderr === "";
+      // Decrypt datasource password
+      const decryptedPassword = decrypt(datasource.passwordEncrypted);
 
-    // Update backup record
-    await prisma.backup.update({
-      where: { id: backupRecord.id },
-      data: {
-        status: isSuccess ? "SUCCESS" : "FAILED",
-        size: fileSize,
-        durationMs,
-        errorMessage: isSuccess ? null : result.stderr || "Backup failed",
-      },
-    });
+      // Prepare connection info
+      const conn: DatabaseConnection = {
+        type: datasource.type as DatabaseConnection["type"],
+        host: datasource.host || undefined,
+        port: datasource.port || undefined,
+        username: datasource.username || undefined,
+        password: decryptedPassword || undefined,
+        databaseName: datasource.databaseName,
+      };
 
-    // Update job status
-    await prisma.job.update({
-      where: { id: jobId },
-      data: {
-        status: isSuccess ? "IDLE" : "ERROR",
-      },
-    });
+      // Generate filename with datasource name
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const extension = getFileExtension(datasource.type as DatabaseConnection["type"]);
+      const safeDatasourceName = datasource.name.replace(/[^a-zA-Z0-9]/g, "_");
+      filename = `${job.title.replace(/[^a-zA-Z0-9]/g, "_")}_${safeDatasourceName}_${timestamp}.${extension}`;
+      filePath = path.join(jobBackupDir, filename);
 
-    // Trigger webhooks
-    try {
-      if (isSuccess) {
-        console.log(`🔔 Triggering JOB_SUCCESS webhook for job ${job.id}`);
-        await triggerWebhooks("JOB_SUCCESS", job.id, job.title, {
-          file: filename,
-          size: formatBytes(fileSize),
-        });
-      } else {
-        console.log(`🔔 Triggering JOB_FAILURE webhook for job ${job.id}`);
-        await triggerWebhooks("JOB_FAILURE", job.id, job.title, {
-          error: result.stderr || "Backup failed",
-        });
+      // Create backup record
+      backupRecord = await prisma.backup.create({
+        data: {
+          jobId: job.id,
+          filename,
+          filePath,
+          size: BigInt(0),
+          status: "FAILED", // Will update on success
+          durationMs: 0,
+        },
+      });
+
+      // Execute backup command
+      const result = await executeBackupCommand(conn, filePath);
+
+      const datasourceEndTime = Date.now();
+      const datasourceDurationMs = datasourceEndTime - datasourceStartTime;
+
+      // Check if file was created and get size
+      let fileSize = BigInt(0);
+      try {
+        const stats = await fs.stat(filePath);
+        fileSize = BigInt(stats.size);
+      } catch {
+        // File doesn't exist, backup failed
       }
-    } catch (webhookError) {
-      console.error(`❌ Error triggering webhooks for job ${job.id}:`, webhookError);
-      // Don't throw - webhook errors shouldn't fail the backup
-    }
-  } catch (error: unknown) {
-    const endTime = Date.now();
-    const durationMs = endTime - startTime;
 
-    // Update job status
-    await prisma.job.update({
-      where: { id: jobId },
-      data: { status: "ERROR" },
-    });
+      // Check if backup was successful
+      const isSuccess = fileSize > 0 && result.stderr === "";
 
-    // Update backup record if it exists
-    if (backupRecord) {
+      // Update backup record
       await prisma.backup.update({
         where: { id: backupRecord.id },
         data: {
-          status: "FAILED",
-          durationMs,
-          errorMessage: (error as { message?: string }).message || "Unknown error",
+          status: isSuccess ? "SUCCESS" : "FAILED",
+          size: fileSize,
+          durationMs: datasourceDurationMs,
+          errorMessage: isSuccess ? null : result.stderr || "Backup failed",
         },
       });
-    } else {
-      // Create failed backup record
-      await prisma.backup.create({
-        data: {
-          jobId: job.id,
-          filename: filename || "unknown",
-          filePath: filePath || "",
-          size: BigInt(0),
-          status: "FAILED",
-          durationMs,
-          errorMessage: (error as { message?: string }).message || "Unknown error",
-        },
-      });
-    }
 
-    // Trigger failure webhook
-    try {
-      console.log(`🔔 Triggering JOB_FAILURE webhook for job ${job.id} (exception)`);
-      await triggerWebhooks("JOB_FAILURE", job.id, job.title, {
+      if (isSuccess) {
+        anySuccess = true;
+        backupResults.push({
+          success: true,
+          datasourceName: datasource.name,
+          filename,
+        });
+        console.log(`✅ Backup successful for datasource: ${datasource.name} (${formatBytes(fileSize)})`);
+      } else {
+        allSuccess = false;
+        backupResults.push({
+          success: false,
+          datasourceName: datasource.name,
+          error: result.stderr || "Backup failed",
+        });
+        console.error(`❌ Backup failed for datasource: ${datasource.name} - ${result.stderr || "Unknown error"}`);
+      }
+    } catch (error: unknown) {
+      allSuccess = false;
+      const datasourceEndTime = Date.now();
+      const datasourceDurationMs = datasourceEndTime - datasourceStartTime;
+
+      backupResults.push({
+        success: false,
+        datasourceName: datasource.name,
         error: (error as { message?: string }).message || "Unknown error",
       });
-    } catch (webhookError) {
-      console.error(`❌ Error triggering webhooks for job ${job.id}:`, webhookError);
-      // Don't throw - webhook errors shouldn't fail the backup
-    }
 
-    throw error;
+      // Update backup record if it exists
+      if (backupRecord) {
+        await prisma.backup.update({
+          where: { id: backupRecord.id },
+          data: {
+            status: "FAILED",
+            durationMs: datasourceDurationMs,
+            errorMessage: (error as { message?: string }).message || "Unknown error",
+          },
+        });
+      } else {
+        // Create failed backup record
+        await prisma.backup.create({
+          data: {
+            jobId: job.id,
+            filename: filename || "unknown",
+            filePath: filePath || "",
+            size: BigInt(0),
+            status: "FAILED",
+            durationMs: datasourceDurationMs,
+            errorMessage: (error as { message?: string }).message || "Unknown error",
+          },
+        });
+      }
+
+      console.error(`❌ Error backing up datasource ${datasource.name}:`, error);
+    }
+  }
+
+  const endTime = Date.now();
+  const totalDurationMs = endTime - startTime;
+
+  // Update job status based on results
+  await prisma.job.update({
+    where: { id: jobId },
+    data: {
+      status: allSuccess ? "IDLE" : anySuccess ? "IDLE" : "ERROR", // If any succeeded, mark as IDLE
+    },
+  });
+
+  // Trigger webhooks
+  try {
+    if (allSuccess) {
+      console.log(`🔔 Triggering JOB_SUCCESS webhook for job ${job.id} (all datasources backed up)`);
+      const successFiles = backupResults.filter(r => r.success && r.filename).map(r => r.filename!);
+      await triggerWebhooks("JOB_SUCCESS", job.id, job.title, {
+        file: successFiles.length > 0 ? successFiles.join(", ") : null,
+        size: null, // Multiple files, size not applicable
+      });
+    } else if (anySuccess) {
+      console.log(`🔔 Triggering JOB_SUCCESS webhook for job ${job.id} (partial success)`);
+      const successFiles = backupResults.filter(r => r.success && r.filename).map(r => r.filename!);
+      await triggerWebhooks("JOB_SUCCESS", job.id, job.title, {
+        file: successFiles.length > 0 ? successFiles.join(", ") : null,
+        size: null,
+      });
+    } else {
+      console.log(`🔔 Triggering JOB_FAILURE webhook for job ${job.id} (all datasources failed)`);
+      const errors = backupResults.filter(r => !r.success).map(r => `${r.datasourceName}: ${r.error || "Unknown error"}`).join("; ");
+      await triggerWebhooks("JOB_FAILURE", job.id, job.title, {
+        error: errors || "All backups failed",
+      });
+    }
+  } catch (webhookError) {
+    console.error(`❌ Error triggering webhooks for job ${job.id}:`, webhookError);
+    // Don't throw - webhook errors shouldn't fail the backup
+  }
+
+  // If all failed, throw error
+  if (!anySuccess) {
+    throw new Error(`All backups failed for job ${jobId}`);
   }
 }
-

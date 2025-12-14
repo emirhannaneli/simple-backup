@@ -99,32 +99,34 @@ export default function WebhooksPage() {
       </div>
 
       <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>URL</TableHead>
-              <TableHead>Method</TableHead>
-              <TableHead>Events</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {webhooks.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
-                  No webhooks found. Create your first webhook to get started.
-                </TableCell>
-              </TableRow>
-            ) : (
-              webhooks.map((webhook) => {
-                const events = Array.isArray(webhook.events)
-                  ? webhook.events
-                  : JSON.parse(webhook.events || "[]");
-                return (
-                  <TableRow key={webhook.id}>
-                    <TableCell className="font-medium">{webhook.url}</TableCell>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>URL</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead>Events</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {webhooks.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground">
+                          No webhooks found. Create your first webhook to get started.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      webhooks.map((webhook) => {
+                        const events = Array.isArray(webhook.events)
+                          ? webhook.events
+                          : JSON.parse(webhook.events || "[]");
+                        return (
+                          <TableRow key={webhook.id}>
+                            <TableCell className="font-medium">{webhook.name || "Unnamed"}</TableCell>
+                            <TableCell className="font-mono text-sm">{webhook.url}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{webhook.method}</Badge>
                     </TableCell>

@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { resolveHeaders } from "./env-resolver";
+import { resolvePayload, getDefaultPayload, type PayloadVariables } from "./payload-resolver";
 
 export type WebhookEvent = "JOB_SUCCESS" | "JOB_FAILURE";
 
@@ -43,20 +44,18 @@ export async function triggerWebhooks(
     return;
   }
 
-  const payload: WebhookPayload = {
-    event_type: "backup-webhook",
-    client_payload: {
-      jobId,
-      event,
-      details: {
-        file: details.file || null,
-        size: details.size || null,
-        error: details.error || null,
-      },
-    },
+  // Prepare variables for payload resolution
+  const payloadVariables: PayloadVariables = {
+    jobId,
+    event,
+    jobName,
+    file: details.file || null,
+    size: details.size || null,
+    error: details.error || null,
+    timestamp: new Date().toISOString(),
   };
 
-  console.log(`📤 Webhook payload:`, JSON.stringify(payload, null, 2));
+  console.log(`📤 Payload variables:`, JSON.stringify(payloadVariables, null, 2));
 
   const promises = webhooks.map(async (webhook) => {
     let events: string[] = [];
@@ -74,7 +73,26 @@ export async function triggerWebhooks(
       return;
     }
 
-    console.log(`✅ Webhook ${webhook.id} will be triggered for event: ${event}`);
+    // Check if webhook is listening to specific jobs
+    let jobIds: string[] | null = null;
+    if (webhook.jobIds) {
+      try {
+        jobIds = JSON.parse(webhook.jobIds) as string[];
+      } catch (error) {
+        console.warn(`⚠️ Failed to parse jobIds for webhook ${webhook.id}:`, error);
+      }
+    }
+
+    // If jobIds is specified and not empty, check if this job is in the list
+    if (jobIds && jobIds.length > 0) {
+      if (!jobIds.includes(jobId)) {
+        console.log(`⏭️ Webhook ${webhook.id} skipped - job ${jobId} not in subscribed jobs:`, jobIds);
+        return;
+      }
+      console.log(`✅ Webhook ${webhook.id} will be triggered for job ${jobId} (job is in subscribed list)`);
+    } else {
+      console.log(`✅ Webhook ${webhook.id} will be triggered for job ${jobId} (listening to all jobs)`);
+    }
 
     // Parse custom headers if available
     const customHeaders: Record<string, string> = {};
@@ -96,6 +114,26 @@ export async function triggerWebhooks(
       "Content-Type": "application/json",
       ...resolvedHeaders,
     };
+
+    // Resolve payload (use custom if provided, otherwise use default)
+    let payload: any;
+    try {
+      if (webhook.payload && webhook.payload.trim() !== "") {
+        // Use custom payload template
+        payload = resolvePayload(webhook.payload, payloadVariables);
+        console.log(`📝 Using custom payload template for webhook ${webhook.id}`);
+      } else {
+        // Use default payload
+        payload = getDefaultPayload(payloadVariables);
+        console.log(`📝 Using default payload for webhook ${webhook.id}`);
+      }
+      console.log(`📤 Resolved payload for webhook ${webhook.id}:`, JSON.stringify(payload, null, 2));
+    } catch (error) {
+      console.error(`❌ Failed to resolve payload for webhook ${webhook.id}:`, error);
+      // Fallback to default payload on error
+      payload = getDefaultPayload(payloadVariables);
+      console.log(`📝 Falling back to default payload for webhook ${webhook.id}`);
+    }
 
     // Retry logic: try up to 3 times
     const maxRetries = 3;
