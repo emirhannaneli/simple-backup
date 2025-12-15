@@ -62,7 +62,7 @@ COPY --from=builder /app/node_modules/argon2 ./node_modules/argon2
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-RUN apk add --no-cache wget curl unzip bash openssl ca-certificates && \
+RUN apk add --no-cache wget curl unzip bash openssl ca-certificates su-exec && \
     echo "http://dl-cdn.alpinelinux.org/alpine/v3.15/main" >> /etc/apk/repositories && \
     apk update && \
     apk add --no-cache libssl1.1 && \
@@ -70,21 +70,25 @@ RUN apk add --no-cache wget curl unzip bash openssl ca-certificates && \
     cp /root/.bun/bin/bun /usr/local/bin/bun && \
     ln -s /usr/local/bin/bun /usr/local/bin/bunx
 
-# Install database client tools (pre-install for convenience)
-# These are the most common database clients available in Alpine repos
-# Note: Some tools (InfluxDB, Neo4j, MongoDB, Cassandra) may require manual installation
-RUN apk add --no-cache \
-    mysql-client \
-    postgresql-client \
-    sqlite \
-    redis \
-    openjdk17-jre
+# Add edge repository for additional packages (mongodb-tools, cypher-shell)
+# This will be used when clients are installed via UI
+RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
+    apk update
 
-# Dizinleri oluştur
+# Note: Database clients are NOT pre-installed
+# They can be installed via the web UI when needed
+# This keeps the image smaller and allows users to install only what they need
+
+# Dizinleri oluştur ve izinleri ayarla
+# /data dizini volume olarak mount edilebilir, bu yüzden entrypoint'te de kontrol edilecek
 RUN mkdir -p /data /data/backups && \
-    chown -R nextjs:nodejs /app /data
+    chown -R nextjs:nodejs /app && \
+    chmod -R 755 /data || true
 
-USER nextjs
+# Note: We don't set USER here because entrypoint needs to run as root initially
+# to fix permissions for /data volume mounts, then it will switch to nextjs user
+# This is safe because entrypoint switches to nextjs before starting the app
+# USER nextjs
 
 EXPOSE 80
 

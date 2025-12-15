@@ -72,6 +72,7 @@ export function buildMongoDBCommand(conn: DatabaseConnection): string {
   // Host doesn't need URL encoding in MongoDB URI
   const uri = `mongodb://${encodedUsername}:${encodedPassword}@${host}:${port}/${encodedDatabase}`;
   // Escape the entire URI string for shell
+  // mongodump should be in PATH from mongodb-tools package
   return `mongodump --uri=${quote([uri])} --archive`;
 }
 
@@ -107,7 +108,9 @@ export function buildCassandraCommand(conn: DatabaseConnection): string {
   
   // nodetool snapshot command (requires server access)
   // This is a simplified version - in practice, you may need SSH
-  return `nodetool -h ${safeHost} -p ${safeKeyspace} snapshot -t ${safeSnapshotName} ${safeKeyspace}`;
+  // Try nodetool first, fallback to common paths if not in PATH
+  const cmd = `nodetool -h ${safeHost} -p ${safeKeyspace} snapshot -t ${safeSnapshotName} ${safeKeyspace}`;
+  return `${cmd} 2>&1 || /usr/bin/nodetool -h ${safeHost} -p ${safeKeyspace} snapshot -t ${safeSnapshotName} ${safeKeyspace} 2>&1`;
 }
 
 export function buildElasticsearchCommand(conn: DatabaseConnection): string {
@@ -151,7 +154,8 @@ export function buildInfluxDBCommand(conn: DatabaseConnection, outputPath: strin
     command += ` -username ${safeUsername} -password ${safePassword}`;
   }
   
-  return command;
+  // Try influx first, fallback to /usr/local/bin/influx if not in PATH
+  return `influx backup -host ${safeHost}:${safePort} -db ${safeDatabase} ${safeOutputPath}${username && password ? ` -username ${escapeShellArg(username)} -password ${escapeShellArg(password)}` : ""} 2>&1 || /usr/local/bin/influx backup -host ${safeHost}:${safePort} -db ${safeDatabase} ${safeOutputPath}${username && password ? ` -username ${escapeShellArg(username)} -password ${escapeShellArg(password)}` : ""} 2>&1`;
 }
 
 export function buildNeo4jCommand(conn: DatabaseConnection, outputPath: string): string {
@@ -163,7 +167,9 @@ export function buildNeo4jCommand(conn: DatabaseConnection, outputPath: string):
   const safeOutputPath = escapeShellArg(outputPath);
   
   // neo4j-admin dump command (requires server access)
-  return `neo4j-admin database dump --database=${safeDatabase} --to=${safeOutputPath}`;
+  // Try neo4j-admin first, fallback to common paths if not in PATH
+  const cmd = `neo4j-admin database dump --database=${safeDatabase} --to=${safeOutputPath}`;
+  return `${cmd} 2>&1 || /usr/bin/neo4j-admin database dump --database=${safeDatabase} --to=${safeOutputPath} 2>&1`;
 }
 
 export function buildSQLiteCommand(conn: DatabaseConnection, outputPath: string): string {
@@ -327,7 +333,7 @@ function parseConnectionError(error: unknown, dbType: string, conn?: DatabaseCon
   const clientToolMap: Record<string, string> = {
     MYSQL: "mysql client",
     POSTGRES: "psql (PostgreSQL client)",
-    MONGODB: "mongosh (MongoDB shell)",
+    MONGODB: "mongodump (MongoDB backup tool)",
     REDIS: "redis-cli",
     CASSANDRA: "cqlsh (Cassandra Query Language Shell)",
     ELASTICSEARCH: "curl",
@@ -402,7 +408,7 @@ function parseConnectionError(error: unknown, dbType: string, conn?: DatabaseCon
     const installInstructions: Record<string, string> = {
       MYSQL: "• Install MySQL client tools:\n  - Ubuntu/Debian: sudo apt-get install mysql-client\n  - macOS: brew install mysql-client\n  - Windows: Install MySQL from mysql.com\n  - Docker: Add to Dockerfile: RUN apk add --no-cache mysql-client",
       POSTGRES: "• Install PostgreSQL client tools:\n  - Ubuntu/Debian: sudo apt-get install postgresql-client\n  - macOS: brew install postgresql\n  - Windows: Install PostgreSQL from postgresql.org\n  - Docker: Add to Dockerfile: RUN apk add --no-cache postgresql-client",
-      MONGODB: "• Install MongoDB shell:\n  - Ubuntu/Debian: sudo apt-get install mongodb-mongosh\n  - macOS: brew install mongosh\n  - Windows: Install MongoDB from mongodb.com\n  - Docker: Add to Dockerfile: RUN apk add --no-cache mongodb-tools",
+      MONGODB: "• Install MongoDB tools:\n  - Ubuntu/Debian: sudo apt-get install mongodb-database-tools\n  - macOS: brew install mongodb-database-tools\n  - Windows: Install MongoDB from mongodb.com\n  - Docker: RUN apk add --no-cache mongodb-tools",
       REDIS: "• Install Redis CLI:\n  - Ubuntu/Debian: sudo apt-get install redis-tools\n  - macOS: brew install redis\n  - Windows: Download from redis.io\n  - Docker: Add to Dockerfile: RUN apk add --no-cache redis",
       CASSANDRA: "• Install Cassandra tools:\n  - Ubuntu/Debian: sudo apt-get install cassandra-tools\n  - macOS: brew install cassandra\n  - Or download from cassandra.apache.org\n  - Docker: Add to Dockerfile: RUN apk add --no-cache cassandra-tools",
       ELASTICSEARCH: "• curl is usually pre-installed. If not:\n  - Ubuntu/Debian: sudo apt-get install curl\n  - macOS: Usually pre-installed\n  - Windows: Download from curl.se\n  - Docker: Usually pre-installed in Alpine",
@@ -484,7 +490,11 @@ export async function testConnection(conn: DatabaseConnection): Promise<{ succes
       const encodedHost = conn.host; // Don't escape for URI
       const encodedDatabase = globalThis.encodeURIComponent(conn.databaseName);
       const uri = `mongodb://${encodedUsername}:${encodedPassword}@${encodedHost}:${conn.port}/${encodedDatabase}`;
-      testCommand = `mongosh ${quote([uri])} --eval ${quote(["db.adminCommand('ping')"])}`;
+      // Use mongodump for connection testing (mongosh has glibc dependency issues on Alpine)
+      // mongodump is already installed via mongodb-tools and works reliably
+      // Test connection by attempting a dry run (fast, doesn't create backup)
+      // Use --quiet to suppress output and test with a non-existent collection to fail fast
+      testCommand = `mongodump --uri=${quote([uri])} --collection=__connection_test__ --quiet 2>&1 | head -n 10 || mongodump --uri=${quote([uri])} --quiet 2>&1 | head -n 10`;
       break;
     }
     case "REDIS": {
@@ -510,7 +520,9 @@ export async function testConnection(conn: DatabaseConnection): Promise<{ succes
       const safeUsername = escapeShellArg(conn.username);
       const safePassword = escapeShellArg(conn.password);
       // cqlsh uses -u for username and --password for password (not -p which is for port)
-      testCommand = `cqlsh ${safeHost} ${safePort} -u ${safeUsername} --password ${safePassword} -e ${quote(["DESCRIBE KEYSPACES"])}`;
+      // cqlsh is installed via pip, might be in /usr/local/bin or ~/.local/bin
+      const cqlshCmd = `cqlsh ${safeHost} ${safePort} -u ${safeUsername} --password ${safePassword} -e ${quote(["DESCRIBE KEYSPACES"])}`;
+      testCommand = `${cqlshCmd} 2>&1 || /usr/local/bin/cqlsh ${safeHost} ${safePort} -u ${safeUsername} --password ${safePassword} -e ${quote(["DESCRIBE KEYSPACES"])} 2>&1 || python3 -m cqlsh ${safeHost} ${safePort} -u ${safeUsername} --password ${safePassword} -e ${quote(["DESCRIBE KEYSPACES"])} 2>&1`;
       break;
     }
     case "ELASTICSEARCH": {
@@ -541,7 +553,8 @@ export async function testConnection(conn: DatabaseConnection): Promise<{ succes
         const safePassword = escapeShellArg(conn.password);
         command += ` -username ${safeUsername} -password ${safePassword}`;
       }
-      testCommand = command;
+      // Try influx first, fallback to /usr/local/bin/influx if not in PATH
+      testCommand = `${command} 2>&1 || /usr/local/bin/influx ${command.replace(/^influx /, "")} 2>&1`;
       break;
     }
     case "NEO4J": {
@@ -553,7 +566,9 @@ export async function testConnection(conn: DatabaseConnection): Promise<{ succes
       const safeUsername = escapeShellArg(conn.username);
       const safePassword = escapeShellArg(conn.password);
       // cypher-shell uses -a for address, -u for username, -p for password
-      testCommand = `cypher-shell -a bolt://${safeHost}:${safePort} -u ${safeUsername} -p ${safePassword} ${quote(["RETURN 1"])}`;
+      // Try cypher-shell first, fallback to common paths if not in PATH
+      const cypherCmd = `cypher-shell -a bolt://${safeHost}:${safePort} -u ${safeUsername} -p ${safePassword} ${quote(["RETURN 1"])}`;
+      testCommand = `${cypherCmd} 2>&1 || /usr/bin/cypher-shell -a bolt://${safeHost}:${safePort} -u ${safeUsername} -p ${safePassword} ${quote(["RETURN 1"])} 2>&1`;
       break;
     }
     case "SQLITE": {

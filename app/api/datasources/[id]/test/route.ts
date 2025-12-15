@@ -27,14 +27,23 @@ export async function POST(
     // Decrypt password
     const decryptedPassword = decrypt(datasource.passwordEncrypted);
 
-    // Prepare connection info
+    // Check if request body contains updated connection info (for testing with new settings)
+    let body: any = {};
+    try {
+      body = await request.json();
+    } catch {
+      // No body provided, use stored datasource values
+    }
+
+    // Use provided values or fall back to stored datasource values
+    // This allows testing with updated connection settings while using stored password
     const conn: DatabaseConnection = {
-      type: datasource.type as "MYSQL" | "POSTGRES" | "MONGODB",
-      host: datasource.host,
-      port: datasource.port,
-      username: datasource.username,
-      password: decryptedPassword,
-      databaseName: datasource.databaseName,
+      type: (body.type || datasource.type) as "MYSQL" | "POSTGRES" | "MONGODB" | "REDIS" | "CASSANDRA" | "ELASTICSEARCH" | "INFLUXDB" | "NEO4J" | "SQLITE" | "H2",
+      host: body.host !== undefined ? body.host : datasource.host,
+      port: body.port !== undefined ? body.port : datasource.port,
+      username: body.username !== undefined ? body.username : datasource.username,
+      password: body.password !== undefined ? body.password : decryptedPassword, // Use provided password or stored one
+      databaseName: body.databaseName !== undefined ? body.databaseName : datasource.databaseName,
     };
 
     // Test connection

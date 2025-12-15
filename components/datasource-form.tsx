@@ -59,6 +59,7 @@ export function DatasourceForm({
     databaseName: string;
   }>({
     resolver: zodResolver(datasourceSchema),
+    mode: "onChange",
     defaultValues: {
       name: "",
       type: "MYSQL" as const,
@@ -128,12 +129,43 @@ export function DatasourceForm({
     const formData = watch();
     setTesting(true);
     try {
-      // Test connection directly with form data (no need to save)
-      const testRes = await fetch("/api/datasources/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      // For updates, if password is empty, use the existing datasource's password
+      let testRes: Response;
+      
+      if (datasource && (!formData.password || formData.password.trim() === "")) {
+        // Use the existing datasource's test endpoint which uses the stored password
+        // But we need to update the datasource first with the new connection details (except password)
+        // Or use a special test endpoint that accepts partial updates
+        
+        // For now, use the existing datasource test endpoint with current form data
+        // We'll create a test with updated connection info but existing password
+        const testData = {
+          ...formData,
+          // Remove password so the endpoint uses the stored one
+          password: undefined,
+        };
+        
+        // Use the datasource-specific test endpoint which will use stored password
+        testRes = await fetch(`/api/datasources/${datasource.id}/test`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            // Send updated connection info (host, port, username, databaseName)
+            // Password will be taken from stored datasource
+            host: formData.host,
+            port: formData.port,
+            username: formData.username,
+            databaseName: formData.databaseName,
+          }),
+        });
+      } else {
+        // Test connection directly with form data (no need to save)
+        testRes = await fetch("/api/datasources/test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+      }
 
       const result = await testRes.json();
 
@@ -173,10 +205,19 @@ export function DatasourceForm({
       const url = datasource ? `/api/datasources/${datasource.id}` : "/api/datasources";
       const method = datasource ? "PUT" : "POST";
 
+      // For updates, if password is empty or undefined, don't include it in payload (to keep existing password)
+      let payload: any = { ...data };
+      if (datasource) {
+        // Remove password field if it's empty or undefined to keep existing password
+        if (!data.password || data.password.trim() === "") {
+          delete payload.password;
+        }
+      }
+
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -279,11 +320,33 @@ export function DatasourceForm({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password">
+                      Password {datasource && <span className="text-muted-foreground text-xs">(leave empty to keep current)</span>}
+                    </Label>
                     <Input
                       id="password"
                       type="password"
-                      {...register("password")}
+                      {...register("password", {
+                        required: datasource ? false : "Password is required for this database type",
+                        validate: (value) => {
+                          // For updates, password is optional
+                          if (datasource) {
+                            return true;
+                          }
+                          // For new datasources, validate based on type
+                          const dbType = watch("type");
+                          if (dbType === "SQLITE" || dbType === "REDIS") {
+                            return true;
+                          }
+                          if (dbType === "H2" && watch("databaseName")?.startsWith("jdbc:h2:file:")) {
+                            return true;
+                          }
+                          if (!value || value.trim() === "") {
+                            return "Password is required for this database type";
+                          }
+                          return true;
+                        },
+                      })}
                       placeholder={datasource ? "Leave empty to keep current" : ""}
                     />
                     {errors.password && (

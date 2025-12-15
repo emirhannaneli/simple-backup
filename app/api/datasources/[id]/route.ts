@@ -102,7 +102,8 @@ export async function PUT(
     const validated = updateSchema.parse(body);
 
     // Encrypt password before storing (only if provided and not empty)
-    const passwordEncrypted = validated.password && validated.password !== "" 
+    // If password is not in body or is empty string, keep existing password
+    const passwordEncrypted = (validated.password !== undefined && validated.password !== null && validated.password !== "") 
       ? encrypt(validated.password) 
       : undefined;
 
@@ -123,6 +124,9 @@ export async function PUT(
     if (validated.username !== undefined) {
       updateData.username = validated.username;
     }
+    // Only update password if a new one was provided
+    // If passwordEncrypted is undefined, password field is not included in updateData
+    // This means Prisma will not update the password field, keeping the existing one
     if (passwordEncrypted !== undefined) {
       updateData.passwordEncrypted = passwordEncrypted;
     }
