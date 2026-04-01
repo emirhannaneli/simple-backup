@@ -33,11 +33,12 @@ export function formatDuration(ms: number): string {
     return `${ms}ms`;
   }
   
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) {
+  if (ms < 60000) {
+    const seconds = Math.round(ms / 100) / 10;
     return `${seconds}s`;
   }
   
+  const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
   
