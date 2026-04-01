@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/emirhannaneli/simple-backup/compare/v1.4.0...v1.5.0) (2026-04-01)
+
+
+### Features
+
+* implement datasource management API, database connection testing, and schema definitions ([a792858](https://github.com/emirhannaneli/simple-backup/commit/a7928581469425cae7b24c1d1d102d9bc0087d1e))
+
 ## [1.4.0](https://github.com/emirhannaneli/simple-backup/compare/v1.3.0...v1.4.0) (2026-04-01)
 
 
