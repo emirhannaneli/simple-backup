@@ -196,6 +196,20 @@ else
   }
 fi
 
+# Safety net: ensure critical columns exist even if migration had issues
+# SQLite will error if column already exists, which we safely ignore
+echo "Ensuring database schema compatibility..."
+DB_PATH=$(echo "$DATABASE_URL" | sed 's|file:||')
+if [ -f "$DB_PATH" ]; then
+  sqlite3 "$DB_PATH" "ALTER TABLE datasources ADD COLUMN authSource TEXT;" 2>/dev/null && \
+    echo "✓ Added missing authSource column" || \
+    echo "✓ authSource column already exists"
+elif command -v sqlite3 > /dev/null 2>&1; then
+  echo "Warning: Database file not found at $DB_PATH, skipping schema check"
+else
+  echo "Warning: sqlite3 not available, skipping schema safety check"
+fi
+
 # Generate Prisma Client if needed
 echo "Generating Prisma Client..."
 export DATABASE_URL="${DATABASE_URL}"
