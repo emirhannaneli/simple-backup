@@ -143,8 +143,14 @@ export async function executeBackup(jobId: string): Promise<void> {
         // File doesn't exist, backup failed
       }
 
-      // Check if backup was successful
-      const isSuccess = fileSize > 0 && result.stderr === "";
+      // Success = process exited 0 and output file is non-empty. Do not require stderr to be empty:
+      // mongodump (and many CLI tools) write normal progress to stderr.
+      const isSuccess = fileSize > 0 && !result.failed;
+      const errorMessage = isSuccess
+        ? null
+        : result.failed
+          ? (result.stderr || "Backup command failed")
+          : "Backup produced an empty output file";
 
       // Update backup record
       await prisma.backup.update({
@@ -153,7 +159,7 @@ export async function executeBackup(jobId: string): Promise<void> {
           status: isSuccess ? "SUCCESS" : "FAILED",
           size: fileSize,
           durationMs: datasourceDurationMs,
-          errorMessage: isSuccess ? null : result.stderr || "Backup failed",
+          errorMessage,
         },
       });
 
@@ -170,9 +176,9 @@ export async function executeBackup(jobId: string): Promise<void> {
         backupResults.push({
           success: false,
           datasourceName: datasource.name,
-          error: result.stderr || "Backup failed",
+          error: errorMessage || "Backup failed",
         });
-        console.error(`❌ Backup failed for datasource: ${datasource.name} - ${result.stderr || "Unknown error"}`);
+        console.error(`❌ Backup failed for datasource: ${datasource.name} - ${errorMessage || "Unknown error"}`);
       }
     } catch (error: unknown) {
       allSuccess = false;

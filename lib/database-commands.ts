@@ -54,6 +54,8 @@ export interface CommandResult {
   command: string;
   stdout: string;
   stderr: string;
+  /** false when the process exited 0; true when exec failed (non-zero exit, signal, etc.). */
+  failed: boolean;
 }
 
 // Escape shell arguments to prevent command injection
@@ -323,6 +325,7 @@ export async function executeBackupCommand(
       command: fullCommand,
       stdout,
       stderr,
+      failed: false,
     };
   } catch (error: unknown) {
     const err = error as { stdout?: string; stderr?: string; message?: string };
@@ -330,6 +333,7 @@ export async function executeBackupCommand(
       command: fullCommand,
       stdout: err.stdout || "",
       stderr: err.stderr || err.message || "",
+      failed: true,
     };
   }
 }
