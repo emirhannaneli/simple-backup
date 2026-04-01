@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/emirhannaneli/simple-backup/compare/v1.3.0...v1.4.0) (2026-04-01)
+
+
+### Features
+
+* add database command generators for multi-engine backup support ([d2c3930](https://github.com/emirhannaneli/simple-backup/commit/d2c3930172ee2da103d07dde488229960d535638))
+
 ## [1.3.0](https://github.com/emirhannaneli/simple-backup/compare/v1.2.0...v1.3.0) (2026-04-01)
 
 
