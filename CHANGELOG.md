@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/emirhannaneli/simple-backup/compare/v1.9.0...v1.10.0) (2026-04-01)
+
+
+### Features
+
+* add safety check to ensure authSource column exists in SQLite database during entrypoint ([975c47c](https://github.com/emirhannaneli/simple-backup/commit/975c47c749c9a3790dffb2209a3768310add7dac))
+
 ## [1.9.0](https://github.com/emirhannaneli/simple-backup/compare/v1.8.0...v1.9.0) (2026-04-01)
 
 
