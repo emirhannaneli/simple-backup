@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/emirhannaneli/simple-backup/compare/v1.8.0...v1.9.0) (2026-04-01)
+
+
+### Features
+
+* add optional authSource column to datasources table ([be41dc4](https://github.com/emirhannaneli/simple-backup/commit/be41dc432ca1debf009648a0c4dfeff4b469bda0))
+
 ## [1.8.0](https://github.com/emirhannaneli/simple-backup/compare/v1.7.0...v1.8.0) (2026-04-01)
 
 
