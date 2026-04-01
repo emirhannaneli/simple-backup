@@ -11,6 +11,7 @@ export interface DatabaseConnection {
   username?: string;
   password?: string;
   databaseName: string;
+  authSource?: string;
 }
 
 export interface CommandResult {
@@ -68,7 +69,12 @@ export function buildMongoDBCommand(conn: DatabaseConnection, outputPath: string
   const encodedUsername = globalThis.encodeURIComponent(username);
   const encodedPassword = globalThis.encodeURIComponent(password);
   const encodedDatabase = globalThis.encodeURIComponent(databaseName);
-  const uri = `mongodb://${encodedUsername}:${encodedPassword}@${host}:${port}/${encodedDatabase}`;
+  let uri = `mongodb://${encodedUsername}:${encodedPassword}@${host}:${port}/${encodedDatabase}`;
+  
+  // Add authSource if provided, default to admin
+  const authSourceVal = conn.authSource || "admin";
+  const encodedAuthSource = globalThis.encodeURIComponent(authSourceVal);
+  uri += `?authSource=${encodedAuthSource}`;
   
   // Use single quotes for URI and output path
   const safeUri = `'${uri.replace(/'/g, "'\\''")}'`;
@@ -489,7 +495,13 @@ export async function testConnection(conn: DatabaseConnection): Promise<{ succes
       const encodedPassword = globalThis.encodeURIComponent(conn.password);
       const encodedHost = conn.host; // Don't escape for URI
       const encodedDatabase = globalThis.encodeURIComponent(conn.databaseName);
-      const uri = `mongodb://${encodedUsername}:${encodedPassword}@${encodedHost}:${conn.port}/${encodedDatabase}`;
+      let uri = `mongodb://${encodedUsername}:${encodedPassword}@${encodedHost}:${conn.port}/${encodedDatabase}`;
+      
+      // Add authSource if provided, default to admin
+      const authSourceVal = conn.authSource || "admin";
+      const encodedAuthSource = globalThis.encodeURIComponent(authSourceVal);
+      uri += `?authSource=${encodedAuthSource}`;
+
       // Use single quotes for URI to prevent shell-quote backslash escaping of characters like ':', '@', etc.
       const safeUri = `'${uri.replace(/'/g, "'\\''")}'`;
       // Use mongodump for connection testing

@@ -57,6 +57,7 @@ export interface DatasourceFormData {
   username: string;
   password: string;
   databaseName: string;
+  authSource?: string;
 }
 
 export interface WebhookFormData {

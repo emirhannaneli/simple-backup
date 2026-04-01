@@ -68,6 +68,7 @@ export async function POST(request: Request) {
         username: validated.username || "",
         passwordEncrypted,
         databaseName: validated.databaseName,
+        authSource: validated.authSource || "",
       },
     });
 

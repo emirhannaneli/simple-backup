@@ -95,9 +95,9 @@ export async function executeBackup(jobId: string): Promise<void> {
         type: datasource.type as DatabaseConnection["type"],
         host: datasource.host || undefined,
         port: datasource.port || undefined,
-        username: datasource.username || undefined,
         password: decryptedPassword || undefined,
         databaseName: datasource.databaseName,
+        authSource: datasource.authSource || undefined,
       };
 
       // Generate filename with datasource name

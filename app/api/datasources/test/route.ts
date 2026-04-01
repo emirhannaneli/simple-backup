@@ -21,6 +21,7 @@ export async function POST(request: Request) {
       username: validated.username,
       password: validated.password,
       databaseName: validated.databaseName,
+      authSource: validated.authSource,
     };
 
     // Test connection

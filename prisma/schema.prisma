@@ -30,6 +30,7 @@ model Datasource {
   username        String
   passwordEncrypted String
   databaseName    String
+  authSource      String?
   createdAt       DateTime @default(now())
 
   jobs            JobDatasource[]

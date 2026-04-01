@@ -44,6 +44,7 @@ export async function POST(
       username: body.username !== undefined ? body.username : datasource.username,
       password: body.password !== undefined ? body.password : decryptedPassword, // Use provided password or stored one
       databaseName: body.databaseName !== undefined ? body.databaseName : datasource.databaseName,
+      authSource: body.authSource !== undefined ? body.authSource : (datasource.authSource || undefined),
     };
 
     // Test connection

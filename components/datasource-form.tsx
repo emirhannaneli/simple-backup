@@ -57,6 +57,7 @@ export function DatasourceForm({
     username?: string;
     password?: string;
     databaseName: string;
+    authSource?: string;
   }>({
     resolver: zodResolver(datasourceSchema),
     mode: "onChange",
@@ -68,6 +69,7 @@ export function DatasourceForm({
       username: "",
       password: "",
       databaseName: "",
+      authSource: "",
     },
   });
 
@@ -84,6 +86,7 @@ export function DatasourceForm({
           username: datasource.username,
           password: "", // Don't pre-fill password
           databaseName: datasource.databaseName,
+          authSource: datasource.authSource || "",
         });
       } else {
         reset({
@@ -94,6 +97,7 @@ export function DatasourceForm({
           username: "",
           password: "",
           databaseName: "",
+          authSource: "",
         });
       }
     }
@@ -199,7 +203,7 @@ export function DatasourceForm({
     }
   }
 
-  const onSubmit = async (data: { name: string; type: string; host?: string; port?: number; username?: string; password?: string; databaseName: string }) => {
+  const onSubmit = async (data: { name: string; type: string; host?: string; port?: number; username?: string; password?: string; databaseName: string; authSource?: string }) => {
     setLoading(true);
     try {
       const url = datasource ? `/api/datasources/${datasource.id}` : "/api/datasources";
@@ -416,6 +420,25 @@ export function DatasourceForm({
               </p>
             )}
           </div>
+
+          {dbType === "MONGODB" && (
+            <div className="space-y-2">
+              <Label htmlFor="authSource">Authentication Database (Optional)</Label>
+              <Input 
+                id="authSource" 
+                {...register("authSource")} 
+                placeholder="admin (default)" 
+              />
+              <p className="text-xs text-muted-foreground">
+                The database where the user was created (defaults to admin).
+              </p>
+              {errors.authSource && (
+                <p className="text-sm text-destructive">
+                  {errors.authSource.message as string}
+                </p>
+              )}
+            </div>
+          )}
 
           <DialogFooter className="gap-2">
             <Button

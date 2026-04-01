@@ -69,6 +69,7 @@ export async function PUT(
       username: z.string().optional(),
       password: z.string().optional(), // Always optional for updates
       databaseName: z.string().min(1, "Database name/path is required"),
+      authSource: z.string().optional(),
     }).refine((data) => {
       // SQLite and H2 (file-based) don't require host/port
       if (data.type === "SQLITE") {
@@ -112,6 +113,7 @@ export async function PUT(
       name: validated.name,
       type: validated.type,
       databaseName: validated.databaseName,
+      authSource: validated.authSource || "",
     };
 
     // Only update optional fields if they are provided

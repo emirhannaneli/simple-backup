@@ -14,6 +14,7 @@ export const datasourceSchema = z.object({
   username: z.string().optional(),
   password: z.string().optional(),
   databaseName: z.string().min(1, "Database name/path is required"),
+  authSource: z.string().optional(),
 }).refine((data) => {
   // SQLite and H2 (file-based) don't require host/port
   if (data.type === "SQLITE") {
