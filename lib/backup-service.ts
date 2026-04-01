@@ -4,6 +4,7 @@ import { decrypt } from "./encryption";
 import {
   executeBackupCommand,
   getFileExtension,
+  getMissingBackupConnectionFields,
   type DatabaseConnection,
 } from "./database-commands";
 import { triggerWebhooks } from "./webhook-service";
@@ -95,10 +96,18 @@ export async function executeBackup(jobId: string): Promise<void> {
         type: datasource.type as DatabaseConnection["type"],
         host: datasource.host || undefined,
         port: datasource.port || undefined,
+        username: datasource.username || undefined,
         password: decryptedPassword || undefined,
         databaseName: datasource.databaseName,
         authSource: datasource.authSource || undefined,
       };
+
+      const missingFields = getMissingBackupConnectionFields(conn);
+      if (missingFields.length > 0) {
+        throw new Error(
+          `Datasource "${datasource.name}": missing connection field(s): ${missingFields.join(", ")}`
+        );
+      }
 
       // Generate filename with datasource name
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");

@@ -442,7 +442,7 @@ export function DatasourceForm({
                 placeholder="admin (default)" 
               />
               <p className="text-xs text-muted-foreground">
-                The database where the user was created (defaults to admin).
+                Database where credentials are stored. Use admin for Docker init/root users; use your app DB name only if the user was created there.
               </p>
               {errors.authSource && (
                 <p className="text-sm text-destructive">

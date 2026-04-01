@@ -14,6 +14,42 @@ export interface DatabaseConnection {
   authSource?: string;
 }
 
+/** Auth database for MongoDB SCRAM. Empty/null defaults to admin (Docker MONGO_INITDB_* / root users). Set explicitly if the user exists only on the target DB. */
+export function resolveMongoAuthSource(authSource?: string | null): string {
+  const t = authSource?.trim();
+  return t ? t : "admin";
+}
+
+/** Fields required for backup per DB type (aligned with build*Command guards). */
+export function getMissingBackupConnectionFields(conn: DatabaseConnection): string[] {
+  const missing: string[] = [];
+  const { type } = conn;
+
+  if (type === "SQLITE" || type === "H2") {
+    if (!conn.databaseName?.trim()) missing.push("databaseName");
+    return missing;
+  }
+
+  if (type === "REDIS") {
+    if (!conn.host?.trim()) missing.push("host");
+    if (conn.port == null || conn.port < 1) missing.push("port");
+    return missing;
+  }
+
+  if (type === "ELASTICSEARCH" || type === "INFLUXDB") {
+    if (!conn.host?.trim()) missing.push("host");
+    if (conn.port == null || conn.port < 1) missing.push("port");
+    return missing;
+  }
+
+  // MYSQL, POSTGRES, MONGODB, CASSANDRA, NEO4J
+  if (!conn.host?.trim()) missing.push("host");
+  if (conn.port == null || conn.port < 1) missing.push("port");
+  if (!conn.username?.trim()) missing.push("username");
+  if (!conn.password) missing.push("password");
+  return missing;
+}
+
 export interface CommandResult {
   command: string;
   stdout: string;
@@ -70,11 +106,8 @@ export function buildMongoDBCommand(conn: DatabaseConnection, outputPath: string
   const encodedPassword = globalThis.encodeURIComponent(password);
   const encodedDatabase = globalThis.encodeURIComponent(databaseName);
   let uri = `mongodb://${encodedUsername}:${encodedPassword}@${host}:${port}/${encodedDatabase}`;
-  
-  if (conn.authSource && conn.authSource.trim() !== "") {
-    const encodedAuthSource = globalThis.encodeURIComponent(conn.authSource);
-    uri += `?authSource=${encodedAuthSource}`;
-  }
+  const encodedAuthSource = globalThis.encodeURIComponent(resolveMongoAuthSource(conn.authSource));
+  uri += `?authSource=${encodedAuthSource}`;
   
   // Use single quotes for URI and output path
   const safeUri = `'${uri.replace(/'/g, "'\\''")}'`;
@@ -496,11 +529,8 @@ export async function testConnection(conn: DatabaseConnection): Promise<{ succes
       const encodedHost = conn.host; // Don't escape for URI
       const encodedDatabase = globalThis.encodeURIComponent(conn.databaseName);
       let uri = `mongodb://${encodedUsername}:${encodedPassword}@${encodedHost}:${conn.port}/${encodedDatabase}`;
-      
-      if (conn.authSource && conn.authSource.trim() !== "") {
-        const encodedAuthSource = globalThis.encodeURIComponent(conn.authSource);
-        uri += `?authSource=${encodedAuthSource}`;
-      }
+      const encodedAuthSource = globalThis.encodeURIComponent(resolveMongoAuthSource(conn.authSource));
+      uri += `?authSource=${encodedAuthSource}`;
 
       // Use single quotes for URI to prevent shell-quote backslash escaping of characters like ':', '@', etc.
       const safeUri = `'${uri.replace(/'/g, "'\\''")}'`;

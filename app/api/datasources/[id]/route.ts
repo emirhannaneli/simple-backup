@@ -113,7 +113,10 @@ export async function PUT(
       name: validated.name,
       type: validated.type,
       databaseName: validated.databaseName,
-      authSource: validated.authSource || "",
+      authSource:
+        validated.type === "MONGODB"
+          ? (validated.authSource?.trim() || "admin")
+          : (validated.authSource?.trim() || ""),
     };
 
     // Only update optional fields if they are provided
