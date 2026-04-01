@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1](https://github.com/emirhannaneli/simple-backup/compare/v1.10.0...v1.10.1) (2026-04-01)
+
+
+### Bug Fixes
+
+* trim authSource values for MongoDB connections and update related documentation ([de9e355](https://github.com/emirhannaneli/simple-backup/commit/de9e355829024c8d5987016915c3f315ceddad34))
+
 ## [1.10.0](https://github.com/emirhannaneli/simple-backup/compare/v1.9.0...v1.10.0) (2026-04-01)
 
 
