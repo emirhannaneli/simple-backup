@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/emirhannaneli/simple-backup/compare/v1.7.0...v1.8.0) (2026-04-01)
+
+
+### Features
+
+* implement datasource management API and configuration form ([5d55bff](https://github.com/emirhannaneli/simple-backup/commit/5d55bff0a8b5b2105a68310ef91fd38835e0fe91))
+
 ## [1.7.0](https://github.com/emirhannaneli/simple-backup/compare/v1.6.0...v1.7.0) (2026-04-01)
 
 
