@@ -71,9 +71,9 @@ export function buildMongoDBCommand(conn: DatabaseConnection): string {
   const encodedDatabase = globalThis.encodeURIComponent(databaseName);
   // Host doesn't need URL encoding in MongoDB URI
   const uri = `mongodb://${encodedUsername}:${encodedPassword}@${host}:${port}/${encodedDatabase}`;
-  // Escape the entire URI string for shell
-  // mongodump should be in PATH from mongodb-tools package
-  return `mongodump --uri=${quote([uri])} --archive`;
+  // Use single quotes for URI to prevent shell-quote backslash escaping of characters like ':', '@', etc.
+  const safeUri = `'${uri.replace(/'/g, "'\\''")}'`;
+  return `mongodump --uri=${safeUri} --archive`;
 }
 
 export function buildRedisCommand(conn: DatabaseConnection, outputPath: string): string {
@@ -490,11 +490,10 @@ export async function testConnection(conn: DatabaseConnection): Promise<{ succes
       const encodedHost = conn.host; // Don't escape for URI
       const encodedDatabase = globalThis.encodeURIComponent(conn.databaseName);
       const uri = `mongodb://${encodedUsername}:${encodedPassword}@${encodedHost}:${conn.port}/${encodedDatabase}`;
-      // Use mongodump for connection testing (mongosh has glibc dependency issues on Alpine)
-      // mongodump is already installed via mongodb-tools and works reliably
-      // Test connection by attempting a dry run (fast, doesn't create backup)
-      // Use --quiet to suppress output and test with a non-existent collection to fail fast
-      testCommand = `mongodump --uri=${quote([uri])} --collection=__connection_test__ --quiet 2>&1 | head -n 10 || mongodump --uri=${quote([uri])} --quiet 2>&1 | head -n 10`;
+      // Use single quotes for URI to prevent shell-quote backslash escaping of characters like ':', '@', etc.
+      const safeUri = `'${uri.replace(/'/g, "'\\''")}'`;
+      // Use mongodump for connection testing
+      testCommand = `mongodump --uri=${safeUri} --collection=__connection_test__ --quiet 2>&1 | head -n 10 || mongodump --uri=${safeUri} --quiet 2>&1 | head -n 10`;
       break;
     }
     case "REDIS": {
