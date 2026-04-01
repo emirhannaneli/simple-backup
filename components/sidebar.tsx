@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import packageJson from "@/package.json";
 import {
   LayoutDashboard,
   Database,
@@ -121,28 +122,32 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className="flex items-center justify-center gap-4 px-2 py-4">
-          <a
-            href="https://emirman.dev"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center w-10 h-10 rounded-md hover:bg-accent transition-colors"
-            aria-label="Visit website"
-          >
-            <Globe className="h-5 w-5" />
-          </a>
-          <a
-            href="https://github.com/emirhannaneli/simple-backup"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center w-10 h-10 rounded-md hover:bg-accent transition-colors"
-            aria-label="View on GitHub"
-          >
-            <Github className="h-5 w-5" />
-          </a>
+        <div className="flex flex-col items-center gap-2 px-2 py-4">
+          <div className="flex items-center justify-center gap-4">
+            <a
+              href="https://emirman.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center w-10 h-10 rounded-md hover:bg-accent transition-colors"
+              aria-label="Visit website"
+            >
+              <Globe className="h-5 w-5" />
+            </a>
+            <a
+              href="https://github.com/emirhannaneli/simple-backup"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center w-10 h-10 rounded-md hover:bg-accent transition-colors"
+              aria-label="View on GitHub"
+            >
+              <Github className="h-5 w-5" />
+            </a>
+          </div>
+          <span className="text-[10px] font-medium text-muted-foreground opacity-50 selection:bg-none">
+            v{packageJson.version}
+          </span>
         </div>
       </SidebarFooter>
     </Sidebar>
   );
 }
-
