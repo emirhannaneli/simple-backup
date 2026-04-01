@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/emirhannaneli/simple-backup/compare/v1.5.0...v1.6.0) (2026-04-01)
+
+
+### Features
+
+* initialize Prisma schema with models for users, datasources, jobs, backups, api keys, and webhooks ([403c029](https://github.com/emirhannaneli/simple-backup/commit/403c029907ab0dcca6d165a62511221e44f7c32f))
+
 ## [1.5.0](https://github.com/emirhannaneli/simple-backup/compare/v1.4.0...v1.5.0) (2026-04-01)
 
 
