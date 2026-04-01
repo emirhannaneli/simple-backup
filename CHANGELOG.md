@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/emirhannaneli/simple-backup/compare/v1.2.0...v1.3.0) (2026-04-01)
+
+
+### Features
+
+* add GitHub Actions workflow to build and deploy Docker images to GHCR on tag push ([bdf8cc4](https://github.com/emirhannaneli/simple-backup/commit/bdf8cc48e6dabfb7e2c18d8af99c0d241a824564))
+
 ## [1.2.0](https://github.com/emirhannaneli/simple-backup/compare/v1.1.0...v1.2.0) (2026-04-01)
 
 
