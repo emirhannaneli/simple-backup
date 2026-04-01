@@ -43,7 +43,7 @@ model Job {
   title           String
   cronExpression  String
   destinationPath String
-  timezone        String   @default("UTC") // IANA timezone identifier (e.g., "America/New_York", "Europe/Istanbul")
+  timezone        String   @default("UTC") // IANA timezone identifier
   status          String   @default("IDLE") // IDLE, RUNNING, or ERROR
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
@@ -98,9 +98,9 @@ model Webhook {
   url       String
   method    String   @default("POST")
   events    String   // JSON array of event types
-  jobIds    String?  // JSON array of job IDs to listen to (null/empty = all jobs)
-  headers   String?  // JSON object of custom headers (key-value pairs)
-  payload   String?  // JSON string of custom payload template (supports variables like ${jobId}, ${event}, etc.)
+  jobIds    String?  // JSON array of job IDs to listen to
+  headers   String?  // JSON object of custom headers
+  payload   String?  // JSON string of custom payload template
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
@@ -128,4 +128,3 @@ model WebhookLog {
   @@index([webhookId])
   @@index([createdAt])
 }
-
