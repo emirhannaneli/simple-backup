@@ -59,21 +59,22 @@ export function buildPostgreSQLCommand(conn: DatabaseConnection): string {
   return `pg_dump -h ${safeHost} -p ${safePort} -U ${safeUsername} -d ${safeDatabaseName} --no-password`;
 }
 
-export function buildMongoDBCommand(conn: DatabaseConnection): string {
+export function buildMongoDBCommand(conn: DatabaseConnection, outputPath: string): string {
   if (!conn.host || !conn.port || !conn.username || !conn.password) {
     throw new Error("MongoDB requires host, port, username, and password");
   }
   const { host, port, username, password, databaseName } = conn;
   // MongoDB URI encoding: username, password need to be URL encoded
-  // Use global encodeURIComponent function
   const encodedUsername = globalThis.encodeURIComponent(username);
   const encodedPassword = globalThis.encodeURIComponent(password);
   const encodedDatabase = globalThis.encodeURIComponent(databaseName);
-  // Host doesn't need URL encoding in MongoDB URI
   const uri = `mongodb://${encodedUsername}:${encodedPassword}@${host}:${port}/${encodedDatabase}`;
-  // Use single quotes for URI to prevent shell-quote backslash escaping of characters like ':', '@', etc.
+  
+  // Use single quotes for URI and output path
   const safeUri = `'${uri.replace(/'/g, "'\\''")}'`;
-  return `mongodump --uri=${safeUri} --archive`;
+  const safeOutputPath = `'${outputPath.replace(/'/g, "'\\''")}'`;
+  
+  return `mongodump --uri=${safeUri} --archive=${safeOutputPath}`;
 }
 
 export function buildRedisCommand(conn: DatabaseConnection, outputPath: string): string {
@@ -234,7 +235,7 @@ export async function executeBackupCommand(
       command = buildPostgreSQLCommand(conn);
       break;
     case "MONGODB":
-      command = buildMongoDBCommand(conn);
+      command = buildMongoDBCommand(conn, outputPath);
       break;
     case "REDIS":
       command = buildRedisCommand(conn, outputPath);
@@ -261,13 +262,13 @@ export async function executeBackupCommand(
       throw new Error(`Unsupported database type: ${conn.type}`);
   }
 
-  // For some commands, output path is already included in the command
-  // For others, we need to redirect output
-  const needsRedirect = !["REDIS", "SQLITE", "H2", "INFLUXDB", "NEO4J", "ELASTICSEARCH"].includes(conn.type);
+  // Determine if we need to redirect output to the file
+  // MongoDB, Redis, SQLite, etc. already handle output files via their own parameters
+  const needsRedirect = !["MONGODB", "REDIS", "SQLITE", "H2", "INFLUXDB", "NEO4J", "ELASTICSEARCH"].includes(conn.type);
   
   const safeOutputPath = escapeShellArg(outputPath);
   const fullCommand = needsRedirect 
-    ? `${command} > ${safeOutputPath} 2>&1`
+    ? `${command} > ${safeOutputPath}`
     : command;
 
   try {
@@ -275,7 +276,6 @@ export async function executeBackupCommand(
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer
       env: {
         ...process.env,
-        // For PostgreSQL
         PGPASSWORD: conn.type === "POSTGRES" ? conn.password : undefined,
       },
     });
