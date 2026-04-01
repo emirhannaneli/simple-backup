@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/emirhannaneli/simple-backup/compare/v1.6.0...v1.7.0) (2026-04-01)
+
+
+### Features
+
+* initialize system database with Prisma schema ([42ff284](https://github.com/emirhannaneli/simple-backup/commit/42ff284b612a20704bf1f0ba4311adbf048b4eef))
+
 ## [1.6.0](https://github.com/emirhannaneli/simple-backup/compare/v1.5.0...v1.6.0) (2026-04-01)
 
 
