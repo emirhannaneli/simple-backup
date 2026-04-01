@@ -127,7 +127,19 @@ export function DatasourceForm({
       setValue("host", "");
       setValue("port", 0);
     }
-  }, [dbType, setValue]);
+    
+    // Set default authSource for MongoDB
+    if (dbType === "MONGODB") {
+      if (!datasource || !datasource.authSource) {
+        setValue("authSource", "admin");
+      }
+    } else {
+      // Clear authSource if not MongoDB, unless editing
+      if (!datasource) {
+        setValue("authSource", "");
+      }
+    }
+  }, [dbType, setValue, datasource]);
 
   async function handleTest() {
     const formData = watch();

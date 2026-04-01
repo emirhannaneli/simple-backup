@@ -68,7 +68,7 @@ export async function POST(request: Request) {
         username: validated.username || "",
         passwordEncrypted,
         databaseName: validated.databaseName,
-        authSource: validated.authSource || "",
+        authSource: validated.type === "MONGODB" ? (validated.authSource || "admin") : (validated.authSource || ""),
       },
     });
 

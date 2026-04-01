@@ -71,10 +71,10 @@ export function buildMongoDBCommand(conn: DatabaseConnection, outputPath: string
   const encodedDatabase = globalThis.encodeURIComponent(databaseName);
   let uri = `mongodb://${encodedUsername}:${encodedPassword}@${host}:${port}/${encodedDatabase}`;
   
-  // Add authSource if provided, default to admin
-  const authSourceVal = conn.authSource || "admin";
-  const encodedAuthSource = globalThis.encodeURIComponent(authSourceVal);
-  uri += `?authSource=${encodedAuthSource}`;
+  if (conn.authSource && conn.authSource.trim() !== "") {
+    const encodedAuthSource = globalThis.encodeURIComponent(conn.authSource);
+    uri += `?authSource=${encodedAuthSource}`;
+  }
   
   // Use single quotes for URI and output path
   const safeUri = `'${uri.replace(/'/g, "'\\''")}'`;
@@ -497,10 +497,10 @@ export async function testConnection(conn: DatabaseConnection): Promise<{ succes
       const encodedDatabase = globalThis.encodeURIComponent(conn.databaseName);
       let uri = `mongodb://${encodedUsername}:${encodedPassword}@${encodedHost}:${conn.port}/${encodedDatabase}`;
       
-      // Add authSource if provided, default to admin
-      const authSourceVal = conn.authSource || "admin";
-      const encodedAuthSource = globalThis.encodeURIComponent(authSourceVal);
-      uri += `?authSource=${encodedAuthSource}`;
+      if (conn.authSource && conn.authSource.trim() !== "") {
+        const encodedAuthSource = globalThis.encodeURIComponent(conn.authSource);
+        uri += `?authSource=${encodedAuthSource}`;
+      }
 
       // Use single quotes for URI to prevent shell-quote backslash escaping of characters like ':', '@', etc.
       const safeUri = `'${uri.replace(/'/g, "'\\''")}'`;
