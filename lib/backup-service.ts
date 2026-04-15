@@ -51,6 +51,10 @@ export async function executeBackup(jobId: string): Promise<void> {
     throw new Error(`Job is not active: ${jobId}`);
   }
 
+  if (job.status === "RUNNING") {
+    throw new Error(`Job is already running: ${jobId}`);
+  }
+
   if (!job.datasources || job.datasources.length === 0) {
     throw new Error(`Job has no datasources: ${jobId}`);
   }
