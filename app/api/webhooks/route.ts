@@ -16,12 +16,13 @@ export async function GET() {
   });
 
   // Parse events, headers, payload, and jobIds JSON
-  const webhooksWithParsedData = webhooks.map((webhook: { events: string; jobIds?: string | null; headers?: string | null; payload?: string | null; [key: string]: any }) => ({
+  const webhooksWithParsedData = webhooks.map((webhook: { events: string; jobIds?: string | null; headers?: string | null; payload?: string | null; environment?: string | null; [key: string]: any }) => ({
     ...webhook,
     events: JSON.parse(webhook.events),
     jobIds: webhook.jobIds ? JSON.parse(webhook.jobIds) : null,
     headers: webhook.headers ? JSON.parse(webhook.headers) : undefined,
     payload: webhook.payload || null,
+    environment: webhook.environment || null,
   }));
 
   return NextResponse.json({ webhooks: webhooksWithParsedData });
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
         jobIds: validated.jobIds && validated.jobIds.length > 0 ? JSON.stringify(validated.jobIds) : null,
         headers: validated.headers ? JSON.stringify(validated.headers) : null,
         payload: validated.payload && validated.payload.trim() !== "" ? validated.payload : null,
+        environment: (validated as any).environment && (validated as any).environment.trim() !== "" ? (validated as any).environment.trim() : null,
         isActive: validated.isActive,
       },
     });
@@ -58,6 +60,7 @@ export async function POST(request: Request) {
           jobIds: webhook.jobIds ? JSON.parse(webhook.jobIds) : null,
           headers: webhook.headers ? JSON.parse(webhook.headers) : undefined,
           payload: webhook.payload || null,
+          environment: webhook.environment || null,
         },
       },
       { status: 201 }

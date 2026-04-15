@@ -93,6 +93,7 @@ export const webhookSchema = z.object({
       return false;
     }
   }, "Payload must be valid JSON"), // JSON string for custom payload template
+  environment: z.string().optional(), // Optional environment tag (e.g. "prod", "stage")
   isActive: z.boolean().default(true),
 });
 

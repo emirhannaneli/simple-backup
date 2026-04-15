@@ -64,6 +64,7 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
       jobIds: [] as string[],
       headers: {} as Record<string, string>,
       payload: "",
+      environment: "",
       isActive: true,
     },
   });
@@ -145,6 +146,7 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
           jobIds: parsedJobIds,
           headers: parsedHeaders,
           payload: payloadValue,
+          environment: (webhook as any).environment || "",
           isActive: webhook.isActive,
         });
       } else {
@@ -157,6 +159,7 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
           jobIds: [],
           headers: {},
           payload: "",
+          environment: "",
           isActive: true,
         });
       }
@@ -433,6 +436,18 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="environment">Environment (Optional)</Label>
+            <Input
+              id="environment"
+              {...register("environment")}
+              placeholder="prod, stage, dev..."
+            />
+            <p className="text-xs text-muted-foreground">
+              Tag this webhook with an environment. Included as <code className="bg-muted px-1 rounded">environment</code> in the payload (e.g. used by GitHub Actions to route stage vs prod).
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="payload">Custom Payload (JSON)</Label>
               <Button
@@ -445,6 +460,7 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
                     client_payload: {
                       jobId: "${jobId}",
                       event: "${event}",
+                      environment: "${environment}",
                       jobName: "${jobName}",
                       details: {
                         file: "${file}",
@@ -477,7 +493,7 @@ export function WebhookForm({ open, onOpenChange, webhook, onSuccess }: WebhookF
             <p className="text-xs text-muted-foreground">
               Optional: Customize the webhook payload. Leave empty to use default format. Available variables:
               <br />
-              <code className="bg-muted px-1 rounded">${`{jobId}`}</code>, <code className="bg-muted px-1 rounded">${`{event}`}</code>, <code className="bg-muted px-1 rounded">${`{jobName}`}</code>, <code className="bg-muted px-1 rounded">${`{file}`}</code>, <code className="bg-muted px-1 rounded">${`{size}`}</code>, <code className="bg-muted px-1 rounded">${`{error}`}</code>, <code className="bg-muted px-1 rounded">${`{timestamp}`}</code>
+              <code className="bg-muted px-1 rounded">${`{jobId}`}</code>, <code className="bg-muted px-1 rounded">${`{event}`}</code>, <code className="bg-muted px-1 rounded">${`{environment}`}</code>, <code className="bg-muted px-1 rounded">${`{jobName}`}</code>, <code className="bg-muted px-1 rounded">${`{file}`}</code>, <code className="bg-muted px-1 rounded">${`{size}`}</code>, <code className="bg-muted px-1 rounded">${`{error}`}</code>, <code className="bg-muted px-1 rounded">${`{timestamp}`}</code>
             </p>
           </div>
 

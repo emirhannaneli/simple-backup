@@ -100,7 +100,8 @@ model Webhook {
   events    String   // JSON array of event types
   jobIds    String?  // JSON array of job IDs to listen to
   headers   String?  // JSON object of custom headers
-  payload   String?  // JSON string of custom payload template
+  payload     String?  // JSON string of custom payload template
+  environment String?  // Optional environment tag (e.g. "prod", "stage") included in payload
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 

@@ -27,6 +27,7 @@ export async function PUT(
         jobIds: validated.jobIds && validated.jobIds.length > 0 ? JSON.stringify(validated.jobIds) : null,
         headers: validated.headers ? JSON.stringify(validated.headers) : null,
         payload: validated.payload && validated.payload.trim() !== "" ? validated.payload : null,
+        environment: (validated as any).environment && (validated as any).environment.trim() !== "" ? (validated as any).environment.trim() : null,
         isActive: validated.isActive,
       },
     });
@@ -38,6 +39,7 @@ export async function PUT(
         jobIds: webhook.jobIds ? JSON.parse(webhook.jobIds) : null,
         headers: webhook.headers ? JSON.parse(webhook.headers) : undefined,
         payload: webhook.payload || null,
+        environment: webhook.environment || null,
       },
     });
   } catch (error: any) {

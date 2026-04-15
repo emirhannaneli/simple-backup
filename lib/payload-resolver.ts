@@ -12,6 +12,7 @@ export interface PayloadVariables {
   jobId: string;
   event: string;
   jobName: string;
+  environment?: string | null;
   file?: string | null;
   size?: string | null;
   error?: string | null;
@@ -106,6 +107,7 @@ export function getDefaultPayload(variables: PayloadVariables): any {
     client_payload: {
       jobId: variables.jobId,
       event: variables.event,
+      ...(variables.environment ? { environment: variables.environment } : {}),
       details: {
         file: variables.file || null,
         size: variables.size || null,

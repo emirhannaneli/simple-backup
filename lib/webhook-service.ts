@@ -44,8 +44,8 @@ export async function triggerWebhooks(
     return;
   }
 
-  // Prepare variables for payload resolution
-  const payloadVariables: PayloadVariables = {
+  // Prepare variables for payload resolution (environment is per-webhook, set below)
+  const basePayloadVariables: Omit<PayloadVariables, "environment"> = {
     jobId,
     event,
     jobName,
@@ -55,7 +55,7 @@ export async function triggerWebhooks(
     timestamp: new Date().toISOString(),
   };
 
-  console.log(`📤 Payload variables:`, JSON.stringify(payloadVariables, null, 2));
+  console.log(`📤 Base payload variables:`, JSON.stringify(basePayloadVariables, null, 2));
 
   const promises = webhooks.map(async (webhook) => {
     let events: string[] = [];
@@ -113,6 +113,12 @@ export async function triggerWebhooks(
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...resolvedHeaders,
+    };
+
+    // Build per-webhook payload variables (include environment if configured)
+    const payloadVariables: PayloadVariables = {
+      ...basePayloadVariables,
+      environment: (webhook as any).environment || null,
     };
 
     // Resolve payload (use custom if provided, otherwise use default)
