@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.11.0](https://github.com/emirhannaneli/simple-backup/compare/v1.10.1...v1.11.0) (2026-04-15)
+
+
+### Features
+
+* add environment field to webhooks for multi-environment routing ([37aee1d](https://github.com/emirhannaneli/simple-backup/commit/37aee1d60cdc1a81671d0c1933d008eb5424aed3))
+
+
+### Bug Fixes
+
+* prevent concurrent job execution to avoid false JOB_FAILURE webhooks ([9fa553f](https://github.com/emirhannaneli/simple-backup/commit/9fa553fb7ead0941f4885d892c574ba518a1df8e))
+
 ## [1.10.1](https://github.com/emirhannaneli/simple-backup/compare/v1.10.0...v1.10.1) (2026-04-01)
 
 
